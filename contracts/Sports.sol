@@ -1,10 +1,23 @@
 // SPDX-License-Identifier: UNLICENSED
 
-pragma solidity 0.8.17;
+pragma solidity ^0.8.17;
 
-contract Sports {
+import "@chainlink/contracts/src/v0.8/ChainlinkClient.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
+
+contract Sports is ChainlinkClient{
+    using Chainlink for Chainlink.Request;
+    using Strings for uint256;
 
     event Print(uint256 print);
+
+    // Game Events and Structs
+    event BetCreated(
+        uint256 indexed _gameId,
+        uint256 _homeScore,
+        uint256 _awayScore
+    );
+
     struct Bet {
         address user;
         uint256 gameId;
@@ -26,7 +39,22 @@ contract Sports {
         uint256 betsCount;
         uint256 betsAmount;
     }
-        
+
+    // Chainlink Events and Structs
+    event RequestNumber(bytes32 indexed requestId, uint256 number);
+    event RequestSent(uint256 requestId, uint32 numWords);
+    event RequestFulfilled(
+        bytes32 requestId,
+        uint256 random
+    );
+
+    struct RequestStatus {
+        uint256 paid; // amount paid in link
+        bool fulfilled; // whether the request has been successfully fulfilled
+    }
+
+    
+    // Game Variables
     mapping(uint256 => mapping(uint256 => Bet)) public betsByGame;
 
     mapping(uint256 => Game) public games;
@@ -35,8 +63,21 @@ contract Sports {
 
     address payable public contractOwner;
 
-    constructor() {
+
+    // Chainlink Variables
+    uint256 public lastNumber;
+    bytes32 private jobId;
+    uint256 private fee;
+
+    constructor(
+        address _chainlinkToken,
+        address _chainlinkOracle,
+        bytes32 _jobId) {
         contractOwner = payable(msg.sender);
+        setChainlinkToken(_chainlinkToken);
+        setChainlinkOracle(_chainlinkOracle);
+        jobId = _jobId;
+        fee = (1 * LINK_DIVISIBILITY) / 10; // 0,1 * 10**18 (Varies by network and job)
     }
 
     event GameCreated(
@@ -51,7 +92,7 @@ contract Sports {
         emit GameCreated(_gameTime, _homeTeam, _awayTeam);
     }
 
-    function updateGameScore(uint256 _gameId, uint256 _homeScore, uint256 _awayScore) public {
+    function updateGameScore(uint256 _gameId, uint256 _homeScore, uint256 _awayScore) public { // it's internal, made public for testing
         require(_gameId < gameCount, "Invalid game ID");
         Game storage game = games[_gameId];
         game.homeScore = _homeScore;
@@ -99,28 +140,45 @@ contract Sports {
             payable(winners[i]).transfer(game.betsAmount / winnersCount);
         }
 
-        uint256 lotteryWinnerIndex = selectLotteryWinner(_gameId, loosersCount);
+        uint256 lotteryWinnerIndex = selectLotteryWinner(loosersCount);
         if (lotteryWinnerIndex != uint256(-1 ** 256)) {
             payable(loosers[1]).transfer(game.lotteryPool);
         }
 
-
     }
 
-    function selectLotteryWinner(uint256 _gameId, uint256 loosersQt) internal view returns (uint256) {
-        // Game storage game = games[_gameId];
-        // uint256 betCount = game.betsCount;
+    function selectLotteryWinner(uint256 loosersQt) public returns (uint256) { //internal, made public for testing
+        Chainlink.Request memory req = buildChainlinkRequest(
+            jobId,
+            address(this),
+            this.fulfill.selector
+        );
 
-        uint256 winnerIndex = uint256(keccak256(abi.encodePacked(block.timestamp, block.difficulty, _gameId))) % loosersQt;
+        string memory url = string(abi.encodePacked("https://www.random.org/integers/?num=1&min=1&col=1&base=10&format=plain&rnd=new&max=", loosersQt.toString()));
+        req.add(
+            "get",
+            url
+        );
+        
+        req.add("path", "");
+
+        bytes32 request = sendChainlinkRequest(req, fee);
+
+        uint256 winnerIndex = lastNumber;
+
+        emit RequestFulfilled(request, winnerIndex);
         
         return winnerIndex;
     }
 
-    event BetCreated(
-        uint256 indexed _gameId,
-        uint256 _homeScore,
-        uint256 _awayScore
-    );
+
+    function fulfill(
+        bytes32 _requestId,
+        uint256 _number
+    ) public recordChainlinkFulfillment(_requestId) {
+        emit RequestNumber(_requestId, _number);
+        lastNumber = _number;
+    }
 
     function makeBet(uint256 _gameId, uint256 _homeScore, uint256 _awayScore) payable public {
         require(_gameId < gameCount, "Invalid game ID");
