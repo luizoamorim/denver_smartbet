@@ -65,7 +65,7 @@ contract Sports is ChainlinkClient{
 
 
     // Chainlink Variables
-    uint256 public lastNumber;
+    uint256 public lastNumber; //private, made public for testing
     bytes32 private jobId;
     uint256 private fee;
 
@@ -76,7 +76,7 @@ contract Sports is ChainlinkClient{
         contractOwner = payable(msg.sender);
         setChainlinkToken(_chainlinkToken);
         setChainlinkOracle(_chainlinkOracle);
-        jobId = _jobId;
+        jobId = _jobId; // por algum motivo n funciona sem jobId hardcoded
         fee = (1 * LINK_DIVISIBILITY) / 10; // 0,1 * 10**18 (Varies by network and job)
     }
 
@@ -112,37 +112,39 @@ contract Sports is ChainlinkClient{
             }
         }
 
-        address[] memory winners = new address[](winnersSize);
-        address[] memory loosers = new address[](game.betsCount - winnersSize);
+        Bet[] memory winners = new Bet[](winnersSize);
+        Bet[] memory loosers = new Bet[](game.betsCount - winnersSize);
         uint256 winnersCount = 0;
         uint256 loosersCount = 0;
+        uint256 winnersBet = 0;
 
         for (uint i = 0; i < game.betsCount; i++) {
             Bet storage bet = betsByGame[_gameId][i];
             if (bet.homeScore == _homeScore && bet.awayScore == _awayScore) {
                 bet.betWon = true;
                 
-                winners[winnersCount] = (bet.user);
+                winners[winnersCount] = (bet);
+                winnersBet += bet.amount
                 winnersCount++;
             } else {
-                loosers[loosersCount] = (bet.user);
+                loosers[loosersCount] = (bet);
                 loosersCount++;
             }
             bet.betCompleted = true;
         }
 
-        if(winners.length == 0) {
+        if(winnersCount == 0) {
             game.lotteryPool += game.betsAmount;
         }
 
         
         for (uint i = 0; i < winnersCount; i++) {
-            payable(winners[i]).transfer(game.betsAmount / winnersCount);
+            payable(winners[i]).user.transfer(game.betsAmount * winners[i].amount / winnersBet);
         }
 
         uint256 lotteryWinnerIndex = selectLotteryWinner(loosersCount);
         if (lotteryWinnerIndex != uint256(-1 ** 256)) {
-            payable(loosers[1]).transfer(game.lotteryPool);
+            payable(loosers[lotteryWinnerIndex].user).transfer(game.lotteryPool);
         }
 
     }
