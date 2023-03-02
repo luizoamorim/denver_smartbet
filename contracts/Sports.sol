@@ -4,10 +4,39 @@ pragma solidity ^0.8.17;
 
 import "@chainlink/contracts/src/v0.8/ChainlinkClient.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract Sports is ChainlinkClient{
+contract Sports is ChainlinkClient, Ownable, AccessControl{
     using Chainlink for Chainlink.Request;
     using Strings for uint256;
+
+    // Game Variables
+    mapping(uint256 => mapping(uint256 => Bet)) public betsByGame;
+    mapping(uint256 => Game) public games;
+
+    uint256 public gameCount;
+
+    // Admin Variables
+    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+    bytes32 public constant MOD_ROLE = keccak256("MOD_ROLE");
+    string private numbersAPI;
+
+
+    // Chainlink Variables
+    bytes32 private jobId;
+    uint256 private fee;
+    uint256 public lastNumber; //private, made public for testing
+
+    modifier isMod {
+        require(hasRole(MOD_ROLE, msg.sender) || hasRole(ADMIN_ROLE, msg.sender), "IS_NOT_MOD_OR_ADMIN");
+        _;
+    }
+
+    modifier isAdmin {
+        require(hasRole(ADMIN_ROLE, msg.sender), "IS_NOT_ADMIN");
+        _;
+    }
 
     event Print(uint256 print);
 
@@ -53,27 +82,27 @@ contract Sports is ChainlinkClient{
         bool fulfilled; // whether the request has been successfully fulfilled
     }
 
-    
-    // Game Variables
-    mapping(uint256 => mapping(uint256 => Bet)) public betsByGame;
-
-    mapping(uint256 => Game) public games;
-
-    uint256 public gameCount;
-
-    address payable public contractOwner;
-
-
-    // Chainlink Variables
-    uint256 public lastNumber; //private, made public for testing
-    bytes32 private jobId;
-    uint256 private fee;
 
     constructor(
         address _chainlinkToken,
         address _chainlinkOracle,
-        bytes32 _jobId) {
-        contractOwner = payable(msg.sender);
+        bytes32 _jobId,
+        address[] memory _mods,
+        address[] memory _admins,
+        string memory _numbersAPI
+        ) {
+
+        // Admin Construct
+        for (uint256 i = 0; i < _mods.length; ++i) {
+            _grantRole(MOD_ROLE, _mods[i]);
+        }
+
+        for (uint256 i = 0; i < _admins.length; ++i) {
+            _grantRole(ADMIN_ROLE, _admins[i]);
+        }
+
+        numbersAPI = _numbersAPI;
+        // Chainlink construct
         setChainlinkToken(_chainlinkToken);
         setChainlinkOracle(_chainlinkOracle);
         jobId = _jobId; // por algum motivo n funciona sem jobId hardcoded
@@ -86,7 +115,7 @@ contract Sports is ChainlinkClient{
         string indexed _awayTeam
     );
 
-    function addGame(string memory _homeTeam, string memory _awayTeam, uint256 _gameTime) public {
+    function addGame(string memory _homeTeam, string memory _awayTeam, uint256 _gameTime) public isMod{
         games[gameCount] = Game(_homeTeam, _awayTeam, _gameTime, 0, 0, false, 0, 0, 0);
         gameCount++;
         emit GameCreated(_gameTime, _homeTeam, _awayTeam);
@@ -124,7 +153,7 @@ contract Sports is ChainlinkClient{
                 bet.betWon = true;
                 
                 winners[winnersCount] = (bet);
-                winnersBet += bet.amount
+                winnersBet += bet.amount;
                 winnersCount++;
             } else {
                 loosers[loosersCount] = (bet);
@@ -139,7 +168,7 @@ contract Sports is ChainlinkClient{
 
         
         for (uint i = 0; i < winnersCount; i++) {
-            payable(winners[i]).user.transfer(game.betsAmount * winners[i].amount / winnersBet);
+            payable(winners[i].user).transfer(game.betsAmount * winners[i].amount / winnersBet);
         }
 
         uint256 lotteryWinnerIndex = selectLotteryWinner(loosersCount);
@@ -156,7 +185,7 @@ contract Sports is ChainlinkClient{
             this.fulfill.selector
         );
 
-        string memory url = string(abi.encodePacked("https://www.random.org/integers/?num=1&min=1&col=1&base=10&format=plain&rnd=new&max=", loosersQt.toString()));
+        string memory url = string(abi.encodePacked(numbersAPI, loosersQt.toString()));
         req.add(
             "get",
             url
@@ -196,7 +225,39 @@ contract Sports is ChainlinkClient{
         betsByGame[_gameId][game.betsCount] = Bet(msg.sender, _gameId, msg.value - ownerFee - lotteryAmount, _homeScore, _awayScore, false, false);
         game.betsCount++;
 
-        contractOwner.transfer(ownerFee);
+        
         emit BetCreated(_gameId, _homeScore, _awayScore);
     }
+
+    // Admin Functions
+
+    function updateNumberAPI(string memory _newUrl) public isAdmin {
+        numbersAPI = _newUrl;
+    }
+
+    function updateChainlinkJobId(bytes32 _newJobId) public isAdmin {
+        jobId = _newJobId;
+    }
+
+    function transferFunds(uint256 _amount, address payable destination) public onlyOwner {
+        destination.transfer(_amount);
+    }
+
+    function addAdmin(address _newAdmin) public onlyOwner {
+        _grantRole(ADMIN_ROLE, _newAdmin);
+    }
+
+    function addMod(address _newMod) public onlyOwner {
+        _grantRole(MOD_ROLE, _newMod);
+    }
+
+    function removeAdmin(address _kickAdmin) public onlyOwner {
+        _revokeRole(ADMIN_ROLE, _kickAdmin);
+    }
+
+    function removeMod(address _kickMod) public onlyOwner {
+        _revokeRole(MOD_ROLE, _kickMod);
+    }
+
+
 }
