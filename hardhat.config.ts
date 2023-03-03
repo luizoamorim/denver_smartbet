@@ -11,7 +11,7 @@ const myInfuraId: string = process.env.INFURA_ID as string;
 const config: HardhatUserConfig = {
   solidity: "0.8.17",
   paths: {
-    artifacts: "./webapp",
+    artifacts: "./frontend/artifacts",
   },
   networks: {
     hardhat: {
