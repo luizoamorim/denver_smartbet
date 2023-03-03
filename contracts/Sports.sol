@@ -7,6 +7,14 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
+interface USDC {
+    function balanceOf(address account) external view returns (uint256);
+    function allowance(address owner, address spender) external view returns (uint256);
+    function transfer(address recipient, uint256 amount) external returns (bool);
+    function approve(address spender, uint256 amount) external returns (bool);
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+}
+
 contract Sports is ChainlinkClient, Ownable, AccessControl{
     using Chainlink for Chainlink.Request;
     using Strings for uint256;
@@ -29,6 +37,9 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
     bytes32 private jobId;
     uint256 private fee;
     uint256 public lastNumber; //private, made public for testing
+
+    // USDC Variables
+    USDC public USDc;
 
     modifier isMod {
         require(hasRole(MOD_ROLE, msg.sender) || hasRole(ADMIN_ROLE, msg.sender) || msg.sender == owner(), "IS_NOT_MOD_OR_ADMIN");
@@ -94,6 +105,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         address _chainlinkOracle,
         bytes32 _jobId,
         address _relayer,
+        address _usdcContractAddress,
         address[] memory _mods,
         address[] memory _admins,
         string memory _numbersAPI,
@@ -113,11 +125,16 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
 
         numbersAPI = _numbersAPI;
         gamesAPI = _gamesAPI;
+
+
         // Chainlink construct
         setChainlinkToken(_chainlinkToken);
         setChainlinkOracle(_chainlinkOracle);
         jobId = _jobId; // por algum motivo n funciona sem jobId hardcoded
         fee = (1 * LINK_DIVISIBILITY) / 10; // 0,1 * 10**18 (Varies by network and job)
+
+        // USDC Construct
+        USDc = USDC(_usdcContractAddress);
     }
 
     event GameCreated(
@@ -202,12 +219,14 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
 
         
         for (uint i = 0; i < winnersCount; i++) {
-            payable(winners[i].user).transfer(game.betsAmount * winners[i].amount / winnersBet);
+            // payable(winners[i].user).transfer(game.betsAmount * winners[i].amount / winnersBet);
+            USDc.transfer(winners[i].user, game.betsAmount * winners[i].amount / winnersBet);
         }
 
         uint256 lotteryWinnerIndex = selectLotteryWinner(loosersCount);
         if (lotteryWinnerIndex != uint256(-1 ** 256)) {
-            payable(loosers[lotteryWinnerIndex].user).transfer(game.lotteryPool);
+            // payable(loosers[lotteryWinnerIndex].user).transfer(game.lotteryPool);
+            USDc.transfer(loosers[lotteryWinnerIndex].user, game.lotteryPool);
         }
 
     }
@@ -253,18 +272,21 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         lastNumber = _number;
     }
 
-    function makeBet(uint256 _gameId, uint256 _homeScore, uint256 _awayScore) payable public {
+    function makeBet(uint256 _gameId, uint256 _homeScore, uint256 _awayScore, uint256 amountInDolar) payable public {
         require(_gameId < gameCount, "Invalid game ID");
-        require(msg.value > 0, "Bet amount must be greater than zero");
+        require(amountInDolar > 0, "Bet amount must be greater than zero");
+
+        bool transactionSuccess = USDc.transferFrom(msg.sender, address(this), amountInDolar * 10 ** 6);
+        require(transactionSuccess, "Transaction failed");
         Game storage game = games[_gameId];
         require(!game.gameCompleted, "Game has already completed");
 
-        uint256 ownerFee = msg.value / 20;
-        uint256 lotteryAmount = msg.value / 5;        
+        uint256 ownerFee = amountInDolar / 20;
+        uint256 lotteryAmount = amountInDolar / 5;        
         game.lotteryPool += lotteryAmount;
-        game.betsAmount += msg.value - ownerFee - lotteryAmount;
+        game.betsAmount += amountInDolar - ownerFee - lotteryAmount;
         
-        betsByGame[_gameId][game.betsCount] = Bet(msg.sender, _gameId, msg.value - ownerFee - lotteryAmount, _homeScore, _awayScore, false, false);
+        betsByGame[_gameId][game.betsCount] = Bet(msg.sender, _gameId, amountInDolar - ownerFee - lotteryAmount, _homeScore, _awayScore, false, false);
         game.betsCount++;
 
         
@@ -285,10 +307,9 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         _grantRole(RELAYER, _newRelayer);
     }
 
-    function transferFunds(uint256 _amount, address payable destination) public onlyOwner {
-        destination.transfer(_amount);
+    function transferFunds(uint256 _amount, address payable destination) public payable onlyOwner {
+        USDc.transfer(destination, _amount * 10 ** 6);
     }
-
 
     // function addMod(address _newMod) public onlyOwner {
     //     _grantRole(MOD_ROLE, _newMod);
