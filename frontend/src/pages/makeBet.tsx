@@ -107,7 +107,7 @@ export default function MakeBet() {
                     </div>
                 </div>
             </div>
-            <div className="flex justify-center h-96 items-center w-full bg-no-repeat bg-cover bg-[url(../../public/assets/betEarn.svg)]">
+            <div className="flex h-96 justify-around items-center w-full bg-no-repeat bg-cover bg-[url(../../public/assets/betEarn.svg)]">
                 <div className="w-3/12 h-5/12 flex flex-col justify-around items-center rounded-3xl bg-white p-3 hover:bg-inchworm px-24">
                     <div className="grid grid-cols-2 gap-4">
                         <div className="bg-gray-200 p-4">Item 1</div>
@@ -147,6 +147,35 @@ export default function MakeBet() {
            font-bold rounded-md hover:bg-appred-250 hover:cursor-pointer"
                     >
                         Bet Now
+                    </div>
+                </div>
+                <div className="w-6/12 h-80 flex flex-col rounded-3xl bg-white p-6 hover:bg-inchworm">
+                    <p className="text-4xl font-bold">Bets History</p>
+                    <div className="flex mt-10 justify-around w-full border-b-2">
+                        <p className="flex justify-center items-center">
+                            Address
+                        </p>
+                        <p>Result</p>
+                        <p>Time</p>
+                        <p>Amont</p>
+                    </div>
+                    <div className="flex mt-4 justify-around w-full">
+                        <p>0x9d3da2b...de5f</p>
+                        <p>100 X 10</p>
+                        <p>03/01/2023 7pm</p>
+                        <p>1 USDC</p>
+                    </div>
+                    <div className="flex mt-4 justify-around w-full">
+                        <p>0x9d3da2b...de5f</p>
+                        <p>100 X 10</p>
+                        <p>03/01/2023 7pm</p>
+                        <p>1 USDC</p>
+                    </div>
+                    <div className="flex mt-4 justify-around w-full">
+                        <p>0x9d3da2b...de5f</p>
+                        <p>100 X 10</p>
+                        <p>03/01/2023 7pm</p>
+                        <p>1 USDC</p>
                     </div>
                 </div>
             </div>
