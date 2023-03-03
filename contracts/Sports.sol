@@ -96,7 +96,8 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         address _relayer,
         address[] memory _mods,
         address[] memory _admins,
-        string memory _numbersAPI
+        string memory _numbersAPI,
+        string memory _gamesAPI
         ) {
 
         // Admin Construct
