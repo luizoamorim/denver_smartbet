@@ -31,12 +31,12 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
     uint256 public lastNumber; //private, made public for testing
 
     modifier isMod {
-        require(hasRole(MOD_ROLE, msg.sender) || hasRole(ADMIN_ROLE, msg.sender) || msg.sender = owner, "IS_NOT_MOD_OR_ADMIN");
+        require(hasRole(MOD_ROLE, msg.sender) || hasRole(ADMIN_ROLE, msg.sender) || msg.sender == owner(), "IS_NOT_MOD_OR_ADMIN");
         _;
     }
 
     modifier isAdmin {
-        require(hasRole(ADMIN_ROLE, msg.sender) || msg.sender == owner, "IS_NOT_ADMIN");
+        require(hasRole(ADMIN_ROLE, msg.sender) || msg.sender == owner(), "IS_NOT_ADMIN");
         _;
     }
 
