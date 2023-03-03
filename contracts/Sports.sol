@@ -102,14 +102,14 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
 
         // Admin Construct
         for (uint256 i = 0; i < _mods.length; ++i) {
-            _grantRole(MOD_ROLE, _mods[i]);
+            grantRole(MOD_ROLE, _mods[i]);
         }
 
         for (uint256 i = 0; i < _admins.length; ++i) {
-            _grantRole(ADMIN_ROLE, _admins[i]);
+            grantRole(ADMIN_ROLE, _admins[i]);
         }
 
-        _grantRole(RELAYER, _relayer);
+        grantRole(RELAYER, _relayer);
 
         numbersAPI = _numbersAPI;
         gamesAPI = _gamesAPI;
@@ -282,7 +282,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
     }
 
     function updateRelayer(address _newRelayer) public isAdmin {
-        _grantRole(RELAYER, _newRelayer);
+        grantRole(RELAYER, _newRelayer);
     }
 
     function transferFunds(uint256 _amount, address payable destination) public onlyOwner {
@@ -291,7 +291,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
 
 
     // function addMod(address _newMod) public onlyOwner {
-    //     _grantRole(MOD_ROLE, _newMod);
+    //     grantRole(MOD_ROLE, _newMod);
     // }
 
     // function removeAdmin(address _kickAdmin) public onlyOwner {
