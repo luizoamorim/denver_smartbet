@@ -20,7 +20,9 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
     // Admin Variables
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant MOD_ROLE = keccak256("MOD_ROLE");
+    bytes32 public constant RELAYER = keccak256("RELAYER");
     string private numbersAPI;
+    string private gamesAPI;
 
 
     // Chainlink Variables
@@ -29,12 +31,17 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
     uint256 public lastNumber; //private, made public for testing
 
     modifier isMod {
-        require(hasRole(MOD_ROLE, msg.sender) || hasRole(ADMIN_ROLE, msg.sender), "IS_NOT_MOD_OR_ADMIN");
+        require(hasRole(MOD_ROLE, msg.sender) || hasRole(ADMIN_ROLE, msg.sender) || msg.sender = owner, "IS_NOT_MOD_OR_ADMIN");
         _;
     }
 
     modifier isAdmin {
-        require(hasRole(ADMIN_ROLE, msg.sender), "IS_NOT_ADMIN");
+        require(hasRole(ADMIN_ROLE, msg.sender) || msg.sender == owner, "IS_NOT_ADMIN");
+        _;
+    }
+
+    modifier isRelayer {
+        require(hasRole(RELAYER, msg.sender), "IS_NOT_RELAYER");
         _;
     }
 
@@ -82,11 +89,11 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         bool fulfilled; // whether the request has been successfully fulfilled
     }
 
-
     constructor(
         address _chainlinkToken,
         address _chainlinkOracle,
         bytes32 _jobId,
+        address _relayer,
         address[] memory _mods,
         address[] memory _admins,
         string memory _numbersAPI
@@ -101,7 +108,10 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
             _grantRole(ADMIN_ROLE, _admins[i]);
         }
 
+        _grantRole(RELAYER, _relayer);
+
         numbersAPI = _numbersAPI;
+        gamesAPI = _gamesAPI;
         // Chainlink construct
         setChainlinkToken(_chainlinkToken);
         setChainlinkOracle(_chainlinkOracle);
@@ -115,13 +125,36 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         string indexed _awayTeam
     );
 
-    function addGame(string memory _homeTeam, string memory _awayTeam, uint256 _gameTime) public isMod{
+    function updateDashboard() public isRelayer{
+        // Chainlink.Request memory req = buildChainlinkRequest(
+        //     jobId,
+        //     address(this),
+        //     this.apiCall.selector
+        // );
+
+        // req.add(
+        //     "get",
+        //     gamesAPI
+        // );
+        
+        // req.add("path", "");
+
+        // bytes32 request = sendChainlinkRequest(req, fee);
+
+        // uint256 winnerIndex = lastNumber;
+
+        // emit RequestFulfilled(request, winnerIndex);
+        
+        // return winnerIndex;
+    }
+
+    function addGame(string memory _homeTeam, string memory _awayTeam, uint256 _gameTime) public isMod{ // it's internal, made public for testing
         games[gameCount] = Game(_homeTeam, _awayTeam, _gameTime, 0, 0, false, 0, 0, 0);
         gameCount++;
         emit GameCreated(_gameTime, _homeTeam, _awayTeam);
     }
 
-    function updateGameScore(uint256 _gameId, uint256 _homeScore, uint256 _awayScore) public { // it's internal, made public for testing
+    function updateGameScore(uint256 _gameId, uint256 _homeScore, uint256 _awayScore) public isMod{ // it's internal, made public for testing
         require(_gameId < gameCount, "Invalid game ID");
         Game storage game = games[_gameId];
         game.homeScore = _homeScore;
@@ -211,6 +244,14 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         lastNumber = _number;
     }
 
+    function apiCall(
+        bytes32 _requestId,
+        uint256 _number
+    ) public recordChainlinkFulfillment(_requestId) {
+        emit RequestNumber(_requestId, _number);
+        lastNumber = _number;
+    }
+
     function makeBet(uint256 _gameId, uint256 _homeScore, uint256 _awayScore) payable public {
         require(_gameId < gameCount, "Invalid game ID");
         require(msg.value > 0, "Bet amount must be greater than zero");
@@ -239,25 +280,26 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         jobId = _newJobId;
     }
 
+    function updateRelayer(address _newRelayer) public isAdmin {
+        _grantRole(RELAYER, _newRelayer);
+    }
+
     function transferFunds(uint256 _amount, address payable destination) public onlyOwner {
         destination.transfer(_amount);
     }
 
-    function addAdmin(address _newAdmin) public onlyOwner {
-        _grantRole(ADMIN_ROLE, _newAdmin);
-    }
 
-    function addMod(address _newMod) public onlyOwner {
-        _grantRole(MOD_ROLE, _newMod);
-    }
+    // function addMod(address _newMod) public onlyOwner {
+    //     _grantRole(MOD_ROLE, _newMod);
+    // }
 
-    function removeAdmin(address _kickAdmin) public onlyOwner {
-        _revokeRole(ADMIN_ROLE, _kickAdmin);
-    }
+    // function removeAdmin(address _kickAdmin) public onlyOwner {
+    //     _revokeRole(ADMIN_ROLE, _kickAdmin);
+    // }
 
-    function removeMod(address _kickMod) public onlyOwner {
-        _revokeRole(MOD_ROLE, _kickMod);
-    }
+    // function removeMod(address _kickMod) public onlyOwner {
+    //     _revokeRole(MOD_ROLE, _kickMod);
+    // }
 
 
 }
