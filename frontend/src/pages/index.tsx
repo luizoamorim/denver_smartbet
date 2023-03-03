@@ -1,110 +1,108 @@
-import { useState } from "react";
-import { ethers } from "ethers";
-import Sports from "../../../artifacts/contracts/Sports.sol/Sports.json";
+import Image from "next/image";
+import logo from "../../public/assets/logo.svg";
+import { useEffect, useState } from "react";
+import SportsABI from "../../artifacts/contracts/Sports.sol/Sports.json";
+import Web3 from "web3";
+import magic from "../utils/magic";
 
 export default function Home() {
-  const [provider, setProvider] =
-    useState<ethers.providers.Web3Provider | null>(null);
-  const [contract, setContract] = useState<ethers.Contract | null>(null);
-  const [betAmount, setBetAmount] = useState<number>(0);
-  const [homeScore, setHomeScore] = useState<number>(0);
-  const [awayScore, setAwayScore] = useState<number>(0);
-  const [gameId, setGameId] = useState<number>(0);
+    const [address, setAddress] = useState("");
 
-  const connectToProvider = async () => {
-    if (window.ethereum) {
-      const provider: any = new ethers.providers.Web3Provider(window.ethereum);
-      await window.ethereum.enable();
-      setProvider(provider);
-      const signer = provider.getSigner();
-      const contract = new ethers.Contract(
-        "0x633D0E740c63d36a503D59C6f8501aBAebdaE189",
-        Sports.abi,
-        signer
-      );
-      setContract(contract);
-    } else {
-      console.log("Ethereum not found");
-    }
-  };
+    useEffect(() => {
+        const storedAddress = localStorage.getItem("walletAddress");
+        if (storedAddress) {
+            setAddress(storedAddress);
+        }
+    }, []);
+    const loginWithMagicLink = async () => {
+        const accounts = await magic.wallet.connectWithUI();
+        localStorage.setItem("walletAddress", accounts[0]);
+        setAddress(accounts[0]);
+    };
 
-  const handleBetAmountChange = (event: any) => {
-    setBetAmount(event.target.value);
-  };
+    const logoutMagicLink = async () => {
+        await magic.wallet.disconnect();
+        localStorage.removeItem("walletAddress");
+        setAddress("");
+    };
 
-  const handleHomeScoreChange = (event: any) => {
-    setHomeScore(event.target.value);
-  };
-
-  const handleAwayScoreChange = (event: any) => {
-    setAwayScore(event.target.value);
-  };
-
-  const handleGameIdChange = (event: any) => {
-    setGameId(event.target.value);
-  };
-
-  const handlePlaceBet = async () => {
-    if (!provider || !contract) {
-      return;
-    }
-
-    const accounts = await provider.listAccounts();
-    const gameIdInt = parseInt(gameId.toString(), 10);
-    const betAmountWei = ethers.utils.parseEther(betAmount.toString());
-    await contract.makeBet(gameIdInt, homeScore, awayScore, {
-      value: betAmountWei,
-    });
-  };
-
-  const handleCreateGame = async () => {
-    if (!provider || !contract) {
-      return;
-    }
-    const gameIdInt = parseInt(gameId.toString(), 10);
-    const gameDateUnix = new Date().getTime() / 1000;
-    await contract.addGame(gameIdInt, gameDateUnix, "A", "B");
-  };
-
-  const getGame = async () => {
-    if (!provider || !contract) {
-      return;
-    }
-    console.log("GAMEEEEE: ", await contract.games(0));
-  };
-
-  return (
-    <div className="flex flex-col justify-center items-center">
-      <button className="p-10 bg-slate-500" onClick={connectToProvider}>
-        Connect to Ethereum
-      </button>
-      <input
-        type="number"
-        placeholder="Bet amount"
-        value={betAmount}
-        onChange={handleBetAmountChange}
-      />
-      <input
-        type="number"
-        placeholder="Home score"
-        value={homeScore}
-        onChange={handleHomeScoreChange}
-      />
-      <input
-        type="number"
-        placeholder="Away score"
-        value={awayScore}
-        onChange={handleAwayScoreChange}
-      />
-      <input
-        type="number"
-        placeholder="Game ID"
-        value={gameId}
-        onChange={handleGameIdChange}
-      />
-      <button onClick={handlePlaceBet}>Place Bet</button>
-      <button onClick={handleCreateGame}>Create a Game</button>
-      <button onClick={getGame}>GET a Game</button>
-    </div>
-  );
+    const makeBet = async () => {
+        const web3 = new Web3(magic.rpcProvider as any);
+        const address = (await web3.eth.getAccounts())[0];
+        console.log("ADDRESS: ", address);
+        const contract = new web3.eth.Contract(
+            SportsABI.abi as any,
+            "0x2397FE9f5e4eeC692B7af2c08728B5D02c7a7c9a",
+        );
+        console.log("CONTRACT: ", contract);
+        // const signer = await provider.getSigner();
+        // console.log("SIGNER TYPE: ", typeof signer);
+        // console.log("SIGNER: ", signer);
+        // const contract = new ethers.Contract(
+        //     "0x2397FE9f5e4eeC692B7af2c08728B5D02c7a7c9a",
+        //     SportsABI,
+        //     magic.rpcProvider,
+        // );
+    };
+    return (
+        <div>
+            <div className="w-full h-32 p-8 bg-appred-100 flex items-center justify-between">
+                <div>
+                    <Image
+                        src={logo}
+                        alt="Logo of the application"
+                        width={350}
+                        height={322}
+                        priority
+                    ></Image>
+                </div>
+                <div className="flex justify-center items-center">
+                    <div
+                        className="bg-apporange-100 hover:bg-apporange-200 hover:cursor-pointer w-40 h-14 rounded flex items-center justify-center text-white"
+                        onClick={() => loginWithMagicLink()}
+                    >
+                        {address && (
+                            <p>
+                                {address.slice(0, 5)}...
+                                {address.slice(
+                                    address.length - 4,
+                                    address.length,
+                                )}
+                            </p>
+                        )}
+                        {!address && <p>ConnectWallet</p>}
+                    </div>
+                    {address && (
+                        <div
+                            className="bg-red-400 hover:cursor-pointer w-14 h-14 ml-2 rounded flex items-center justify-center text-white"
+                            onClick={() => logoutMagicLink()}
+                        >
+                            Exit
+                        </div>
+                    )}
+                    <div
+                        className="bg-blue-700 hover:cursor-pointer w-14 h-14 ml-2 rounded flex items-center justify-center text-white"
+                        onClick={() => makeBet()}
+                    >
+                        Bet
+                    </div>
+                </div>
+            </div>
+            <div className="flex justify-center items-center w-full h-96 bg-no-repeat bg-cover bg-[url(../../public/assets/betEarn.svg)]">
+                <div className="w-80 h-80 max-w-xs flex flex-col justify-around items-center rounded-3xl bg-white p-3 hover:bg-inchworm">
+                    <div className="text-black text-sm font-bold">
+                        Today 5:30 pm
+                    </div>
+                    <div>Team A X Team B</div>
+                    <div
+                        className="bg-appred-200 w-72 h-9 flex justify-center items-center text-white
+           font-bold rounded-md hover:bg-appred-250 hover:cursor-pointer"
+                    >
+                        Bet Now
+                    </div>
+                    <div>100 bets</div>
+                </div>
+            </div>
+        </div>
+    );
 }
