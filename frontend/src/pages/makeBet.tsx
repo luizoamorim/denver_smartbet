@@ -19,16 +19,21 @@ interface GameCardProps {
 function toUSDC(num: number): number {
     return num * 10 ** 6;
 }
-export default function MakeBet({ query }: any) {
+
+function fromUSDC(num: number): number {
+    return num / 10 ** 6;
+}
+export default function MakeBet({ query, bets }: any) {
     const obj = JSON.parse(query.obj);
     const [address, setAddress] = useState("");
     const router = useRouter();
     const [inputAValue, setInputAValue] = useState("");
     const [inputBValue, setInputBValue] = useState("");
     const [inputBetValue, setInputBetValue] = useState("");
+    const [stateBets, setStateBets] = useState(bets);
 
     useEffect(() => {
-        getBetsByGame();
+        // getBetsByGame();
         const storedAddress = localStorage.getItem("walletAddress");
         if (!storedAddress) {
             router.push("/login");
@@ -221,15 +226,32 @@ export default function MakeBet({ query }: any) {
                                 Address
                             </p>
                             <p>Result</p>
-                            <p>Time</p>
                             <p>Amont</p>
                         </div>
-                        <div className="flex mt-4 justify-around w-full">
-                            <p>0x9d3da2b...de5f</p>
-                            <p>100 X 10</p>
-                            <p>03/01/2023 7pm</p>
-                            <p>1 USDC</p>
-                        </div>
+                        {stateBets && (
+                            <div className="flex mt-4 justify-around w-full">
+                                <p>
+                                    {stateBets[0].user.slice(0, 5)}...
+                                    {stateBets[0].user.slice(
+                                        stateBets[0].user.length - 4,
+                                        stateBets[0].user.length,
+                                    )}
+                                </p>
+                                <p>
+                                    {stateBets[0].homeScore} X{" "}
+                                    {stateBets[0].awayScore}
+                                </p>
+                                <p>
+                                    {fromUSDC(parseFloat(stateBets[0].amount))}{" "}
+                                    USDC
+                                </p>
+                            </div>
+                        )}
+                        {!stateBets && (
+                            <div className="flex mt-4 justify-around w-full">
+                                <p>Loading ...</p>
+                            </div>
+                        )}
                     </div>
                     <div className="w-full flex justify-center items-center mt-24">
                         <div className="w-4/12 h-60 flex flex-col mr-24 rounded-3xl bg-white p-6 hover:bg-inchworm">
@@ -272,5 +294,32 @@ export default function MakeBet({ query }: any) {
 }
 
 export async function getServerSideProps(context: any) {
-    return { props: { query: context.query } };
+    const web3 = new Web3(
+        `https://polygon-mumbai.infura.io/v3/${process.env.NEXT_PUBLIC_INFURA_ID}`,
+    );
+
+    const contract = new web3.eth.Contract(
+        SportsABI.abi as any,
+        "0x2f648fc2445bB5F60E8A41Ea573a750455EcCab8",
+    );
+
+    const obj = JSON.parse(context.query.obj);
+    let cont = 0;
+    let bets = [];
+    do {
+        cont++;
+        bets.push(
+            await contract.methods.betsByGame(obj.game?.gameId, cont).call(),
+        );
+    } while (
+        (await contract.methods.betsByGame(obj.game?.gameId, cont)).call() ==
+        !undefined
+    );
+
+    return {
+        props: {
+            query: context.query,
+            bets: JSON.parse(JSON.stringify(bets)),
+        },
+    };
 }
