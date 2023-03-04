@@ -18,6 +18,7 @@ interface USDC {
 contract Sports is ChainlinkClient, Ownable, AccessControl{
     using Chainlink for Chainlink.Request;
     using Strings for uint256;
+    using Strings for bytes32;
 
     // Game Variables
     mapping(uint256 => mapping(uint256 => Bet)) public betsByGame;
@@ -29,14 +30,18 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant MOD_ROLE = keccak256("MOD_ROLE");
     bytes32 public constant RELAYER = keccak256("RELAYER");
-    string private numbersAPI;
-    string private gamesAPI;
+    string public numbersAPI; //private, made public for testing
+    string public gamesAPI; //private, made public for testing
 
 
     // Chainlink Variables
-    bytes32 private jobId;
+    bytes32 private jobIdNumbers;
+    bytes32 private jobIdStrings;
     uint256 private fee;
     uint256 public lastNumber; //private, made public for testing
+    string public lastTeamA; //private, made public for testing
+    string public lastTeamB; //private, made public for testing
+    string public lastDate; //private, made public for testing
 
     // USDC Variables
     USDC public USDc;
@@ -52,7 +57,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
     }
 
     modifier isRelayer {
-        require(hasRole(RELAYER, msg.sender), "IS_NOT_RELAYER");
+        require(hasRole(RELAYER, msg.sender) || msg.sender == owner(), "IS_NOT_RELAYER");
         _;
     }
 
@@ -63,6 +68,12 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         uint256 indexed _gameId,
         uint256 _homeScore,
         uint256 _awayScore
+    );
+
+    event GameCreated(
+        string _gameTime,
+        string indexed _homeTeam,
+        string indexed _awayTeam
     );
 
     struct Bet {
@@ -78,7 +89,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
     struct Game {
         string homeTeam;
         string awayTeam;
-        uint256 gameTime;
+        string gameTime;
         uint256 homeScore;
         uint256 awayScore;
         bool gameCompleted;        
@@ -94,6 +105,12 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         bytes32 requestId,
         uint256 random
     );
+    event RequestMultipleFulfilled(
+        bytes32 indexed requestId,
+        string TeamA,
+        string TeamB,
+        string Date
+    );
 
     struct RequestStatus {
         uint256 paid; // amount paid in link
@@ -103,12 +120,13 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
     constructor(
         address _chainlinkToken,
         address _chainlinkOracle,
-        bytes32 _jobId,
+        bytes32 _jobIdNumbers,
+        bytes32 _jobIdStrings,
         address _relayer,
         address _usdcContractAddress,
         address[] memory _mods,
         address[] memory _admins,
-        string memory _numbersAPI,
+        string memory _numbersAPI, 
         string memory _gamesAPI
         ) {
 
@@ -130,43 +148,16 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         // Chainlink construct
         setChainlinkToken(_chainlinkToken);
         setChainlinkOracle(_chainlinkOracle);
-        jobId = _jobId; // por algum motivo n funciona sem jobId hardcoded
+        jobIdNumbers = _jobIdNumbers; // por algum motivo n funciona sem jobIdNumbers hardcoded
+        jobIdStrings = _jobIdStrings; // por algum motivo n funciona sem _jobIdStrings hardcoded
         fee = (1 * LINK_DIVISIBILITY) / 10; // 0,1 * 10**18 (Varies by network and job)
 
         // USDC Construct
         USDc = USDC(_usdcContractAddress);
     }
 
-    event GameCreated(
-        uint256 _gameTime,
-        string indexed _homeTeam,
-        string indexed _awayTeam
-    );
 
-    function updateDashboard() public isRelayer{
-        // Chainlink.Request memory req = buildChainlinkRequest(
-        //     jobId,
-        //     address(this),
-        //     this.apiCall.selector
-        // );
-
-        // req.add(
-        //     "get",
-        //     gamesAPI
-        // );
-        
-        // req.add("path", "");
-
-        // bytes32 request = sendChainlinkRequest(req, fee);
-
-        // uint256 winnerIndex = lastNumber;
-
-        // emit RequestFulfilled(request, winnerIndex);
-        
-        // return winnerIndex;
-    }
-
-    function addGame(string memory _homeTeam, string memory _awayTeam, uint256 _gameTime) public isMod{ // it's internal, made public for testing
+    function addGame(string memory _homeTeam, string memory _awayTeam, string memory _gameTime) public isMod{ // it's internal, made public for testing
         games[gameCount] = Game(_homeTeam, _awayTeam, _gameTime, 0, 0, false, 0, 0, 0);
         gameCount++;
         emit GameCreated(_gameTime, _homeTeam, _awayTeam);
@@ -233,18 +224,17 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
 
     function selectLotteryWinner(uint256 loosersQt) public returns (uint256) { //internal, made public for testing
         Chainlink.Request memory req = buildChainlinkRequest(
-            jobId,
+            jobIdNumbers,
             address(this),
-            this.fulfill.selector
+            this.fulfillNumber.selector
         );
 
         string memory url = string(abi.encodePacked(numbersAPI, loosersQt.toString()));
-        req.add(
-            "get",
-            url
-        );
+        req.add("get", url);
         
         req.add("path", "");
+
+        req.addInt("times", 1);
 
         bytes32 request = sendChainlinkRequest(req, fee);
 
@@ -256,7 +246,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
     }
 
 
-    function fulfill(
+    function fulfillNumber(
         bytes32 _requestId,
         uint256 _number
     ) public recordChainlinkFulfillment(_requestId) {
@@ -264,29 +254,55 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         lastNumber = _number;
     }
 
-    function apiCall(
-        bytes32 _requestId,
-        uint256 _number
-    ) public recordChainlinkFulfillment(_requestId) {
-        emit RequestNumber(_requestId, _number);
-        lastNumber = _number;
+    function addGamesFromAPI() public {
+    // Build the Chainlink request
+        Chainlink.Request memory req = buildChainlinkRequest(
+            jobIdStrings,
+            address(this),
+            this.fulfillGames.selector
+        );
+
+        // Set the API endpoint
+        req.add("get", gamesAPI);
+
+        // Set the path to the array of games
+
+        string memory TeamA = string(abi.encodePacked(gameCount.toString(), ",TeamA"));
+        string memory TeamB = string(abi.encodePacked(gameCount.toString(), ",TeamB"));
+        string memory Date = string(abi.encodePacked(gameCount.toString(), ",date"));
+
+        req.add("pathTEAMA", TeamA);
+        req.add("pathTEAMB", TeamB);
+        req.add("pathDATE", Date);
+
+        // Send the Chainlink request
+        sendChainlinkRequest(req, fee);
+
+        // Store the requestId for later use in the fulfillGames callback
+        // gameRequests[requestId] = true;
+}
+
+    function fulfillGames(bytes32 _requestId, string memory _teamA, string memory _teamB, string memory _date) public recordChainlinkFulfillment(_requestId) {
+        emit RequestMultipleFulfilled(_requestId, _teamA, _teamB, _date);
+        addGame(_teamA, _teamB, _date);
     }
 
-    function makeBet(uint256 _gameId, uint256 _homeScore, uint256 _awayScore, uint256 amountInDolar) payable public {
+
+    function makeBet(uint256 _gameId, uint256 _homeScore, uint256 _awayScore, uint256 _USDCamount) payable public {
         require(_gameId < gameCount, "Invalid game ID");
-        require(amountInDolar > 0, "Bet amount must be greater than zero");
+        require(_USDCamount > 0, "Bet amount must be greater than zero");
 
-        bool transactionSuccess = USDc.transferFrom(msg.sender, address(this), amountInDolar * 10 ** 6);
+        bool transactionSuccess = USDc.transferFrom(msg.sender, address(this), _USDCamount);
         require(transactionSuccess, "Transaction failed");
         Game storage game = games[_gameId];
         require(!game.gameCompleted, "Game has already completed");
 
-        uint256 ownerFee = amountInDolar / 20;
-        uint256 lotteryAmount = amountInDolar / 5;        
+        uint256 ownerFee = _USDCamount / 20;
+        uint256 lotteryAmount = _USDCamount / 5;        
         game.lotteryPool += lotteryAmount;
-        game.betsAmount += amountInDolar - ownerFee - lotteryAmount;
+        game.betsAmount += _USDCamount - ownerFee - lotteryAmount;
         
-        betsByGame[_gameId][game.betsCount] = Bet(msg.sender, _gameId, amountInDolar - ownerFee - lotteryAmount, _homeScore, _awayScore, false, false);
+        betsByGame[_gameId][game.betsCount] = Bet(msg.sender, _gameId, _USDCamount - ownerFee - lotteryAmount, _homeScore, _awayScore, false, false);
         game.betsCount++;
 
         
@@ -299,29 +315,16 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         numbersAPI = _newUrl;
     }
 
-    function updateChainlinkJobId(bytes32 _newJobId) public isAdmin {
-        jobId = _newJobId;
+    function updateChainlinkJobIdNumbers(bytes32 _newJobIdNumbers) public isAdmin {
+        jobIdNumbers = _newJobIdNumbers;
     }
 
     function updateRelayer(address _newRelayer) public isAdmin {
-        grantRole(RELAYER, _newRelayer);
+        _grantRole(RELAYER, _newRelayer);
     }
 
     function transferFunds(uint256 _amount, address payable destination) public payable onlyOwner {
-        USDc.transfer(destination, _amount * 10 ** 6);
+        USDc.transfer(destination, _amount);
     }
-
-    // function addMod(address _newMod) public onlyOwner {
-    //     grantRole(MOD_ROLE, _newMod);
-    // }
-
-    // function removeAdmin(address _kickAdmin) public onlyOwner {
-    //     _revokeRole(ADMIN_ROLE, _kickAdmin);
-    // }
-
-    // function removeMod(address _kickMod) public onlyOwner {
-    //     _revokeRole(MOD_ROLE, _kickMod);
-    // }
-
 
 }
