@@ -289,7 +289,6 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         betsByGame[_gameId][game.betsCount] = Bet(msg.sender, _gameId, amountInDolar - ownerFee - lotteryAmount, _homeScore, _awayScore, false, false);
         game.betsCount++;
 
-        
         emit BetCreated(_gameId, _homeScore, _awayScore);
     }
 

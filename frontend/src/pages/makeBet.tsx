@@ -2,11 +2,25 @@ import Image from "next/image";
 import logo from "../../public/assets/logo.svg";
 import { useEffect, useState } from "react";
 import SportsABI from "../../artifacts/contracts/Sports.sol/Sports.json";
+import USDCABI from "../utils/abis/USDC.json";
 import Web3 from "web3";
 import magic from "../utils/magic";
 import { useRouter } from "next/router";
+import ethers from "ethers";
 
-export default function MakeBet() {
+interface GameCardProps {
+    gameId: number;
+    date: string;
+    teamA: string;
+    teamB: string;
+    betQt: string;
+}
+
+function toUSDC(num: number): number {
+    return num * 10 ** 6;
+}
+export default function MakeBet({ query }: any) {
+    const obj = JSON.parse(query.obj);
     const [address, setAddress] = useState("");
     const router = useRouter();
     const [inputAValue, setInputAValue] = useState("");
@@ -46,26 +60,59 @@ export default function MakeBet() {
     }
 
     const makeBet = async () => {
+        console.log("ENTRA!!");
         const web3 = new Web3(magic.rpcProvider as any);
         const address = (await web3.eth.getAccounts())[0];
         console.log("ADDRESS: ", address);
         const contract = new web3.eth.Contract(
             SportsABI.abi as any,
-            "0x2397FE9f5e4eeC692B7af2c08728B5D02c7a7c9a",
+            "0xF82e4671436707cD2b609a640c6Fc96DA8F5b27b",
         );
-        console.log("CONTRACT: ", contract);
-        // const signer = await provider.getSigner();
-        // console.log("SIGNER TYPE: ", typeof signer);
-        // console.log("SIGNER: ", signer);
-        // const contract = new ethers.Contract(
-        //     "0x2397FE9f5e4eeC692B7af2c08728B5D02c7a7c9a",
-        //     SportsABI,
-        //     magic.rpcProvider,
+
+        console.log("CONTRATO: ", contract);
+
+        const usdcContract = new web3.eth.Contract(
+            USDCABI as any,
+            "0x0FA8781a83E46826621b3BC094Ea2A0212e71B23",
+        );
+
+        console.log("usdcContract: ", usdcContract);
+
+        // Use the approve function to send USDC to the contract
+        const usdcTxn = await usdcContract.methods.approve(
+            "0x0FA8781a83E46826621b3BC094Ea2A0212e71B23",
+            toUSDC(parseFloat(inputBetValue)),
+        );
+
+        // Wait for the transaction to be mined
+        console.log("await usdcTxn.wait(): ", usdcTxn);
+        // const receipt = await web3.eth.getTransactionReceipt(
+        //     usdcTxn.transactionHash.toString(),
         // );
+
+        contract.methods
+            .makeBet(
+                obj.game?.gameId,
+                inputAValue,
+                inputBValue,
+                toUSDC(parseFloat(inputBetValue)),
+            )
+            .send({
+                from: address,
+                value: 0,
+                gasPrice: web3.utils.toWei("10", "gwei"),
+                gasLimit: 300000,
+            })
+            .then((receipt: any) => {
+                console.log("Transaction receipt:", receipt);
+            })
+            .catch((error: any) => {
+                console.error("Error:", error);
+            });
     };
     return (
-        <div className="">
-            <div className="w-full h-32 p-8 bg-appred-100 flex items-center justify-between">
+        <div style={{ height: "100%" }}>
+            <div className="w-full h-32 p-8 bg-appred-250 flex items-center justify-between">
                 <div>
                     <Image
                         src={logo}
@@ -107,13 +154,16 @@ export default function MakeBet() {
                     </div>
                 </div>
             </div>
-            <div className="flex h-96 justify-around items-center w-full bg-no-repeat bg-cover bg-[url(../../public/assets/betEarn.svg)]">
+            <div
+                className="flex h-96 justify-around items-center w-full bg-no-repeat bg-cover bg-[url(../../public/assets/betEarn.svg)]"
+                style={{ height: "700px" }}
+            >
                 <div className="w-3/12 h-5/12 flex flex-col justify-around items-center rounded-3xl bg-white p-3 hover:bg-inchworm px-24">
                     <div className="grid grid-cols-2 gap-4">
                         <div className="bg-gray-200 p-4">Item 1</div>
                         <div className="bg-gray-200 p-4">Item 2</div>
-                        <div className="bg-gray-200 p-4">Item 3</div>
-                        <div className="bg-gray-200 p-4">Item 4</div>
+                        <div className="bg-gray-200 p-4">{obj.game!.teamA}</div>
+                        <div className="bg-gray-200 p-4">{obj.game!.teamB}</div>
                     </div>
                     <div className="flex w-full justify-between items-center">
                         <input
@@ -145,6 +195,7 @@ export default function MakeBet() {
                     <div
                         className="bg-appred-200 w-72 h-9 flex justify-center items-center text-white
            font-bold rounded-md hover:bg-appred-250 hover:cursor-pointer"
+                        onClick={() => makeBet()}
                     >
                         Bet Now
                     </div>
@@ -179,6 +230,14 @@ export default function MakeBet() {
                     </div>
                 </div>
             </div>
+            <div
+                className="p-8 bg-appred-250 flex items-center justify-between"
+                style={{ height: "150px" }}
+            ></div>
         </div>
     );
+}
+
+export async function getServerSideProps(context: any) {
+    return { props: { query: context.query } };
 }

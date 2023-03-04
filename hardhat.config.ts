@@ -18,8 +18,8 @@ const config: HardhatUserConfig = {
       chainId: 1337,
       gasPrice: 100000000000, // 100 gwei
     },
-    goerli: {
-      url: `https://goerli.infura.io/v3/${myInfuraId}`,
+    mumbai: {
+      url: `https://polygon-mumbai.infura.io/v3/${myInfuraId}`,
       accounts: [myPrivateKey],
     },
   },
