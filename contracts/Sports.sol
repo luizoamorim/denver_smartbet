@@ -34,6 +34,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
     bytes32 public constant RELAYER = keccak256("RELAYER");
     string public numbersAPI; //private, made public for testing
     string public gamesAPI; //private, made public for testing
+    string public resultsAPI; //private, made public for testing
 
 
     // Chainlink Variables
@@ -105,32 +106,12 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
     }
 
     // Chainlink Events and Structs
-    event RequestNumber(bytes32 indexed requestId, uint256 number);
-    event RequestSent(uint256 requestId, uint32 numWords);
-    event RequestBytesFulfilled(
-        bytes32 indexed requestId,
-        uint256 random
-    );
+    event RequestNumberSent(bytes32 indexed requestId);
+    event RequestBytesSent(bytes32 indexed requestId);
+    event RequestResultSent(bytes32 indexed requestId);
+    event RequestNumberFulfilled(bytes32 indexed requestId, uint256 random);
     event RequestBytesFulfilled(bytes32 indexed requestId, bytes[] indexed data);
-
-
-    event RequestGames(
-        bytes32 indexed requestId,
-        bytes TeamA,
-        bytes TeamB,
-        bytes Date
-    );
-
-    event RequesResult(
-        bytes32 indexed requestId,
-        uint256 TeamA,
-        uint256 TeamB
-    );
-
-    struct RequestStatus {
-        uint256 paid; // amount paid in link
-        bool fulfilled; // whether the request has been successfully fulfilled
-    }
+    event RequestResultFulfilled( bytes32 indexed requestId, uint256 TeamA, uint256 TeamB);
 
     constructor(
         address _chainlinkToken,
@@ -228,8 +209,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
             // payable(winners[i].user).transfer(games[_gameId].betsAmount * winners[i].amount / winnersBet);
             USDc.transfer(winners[i].user, games[_gameId].betsAmount * winners[i].amount / winnersBet);
         }
-
-        lastGame = _gameId;
+        
         selectLotteryWinner(loosersCount);
 
     }
@@ -248,17 +228,44 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
 
         bytes32 request = sendChainlinkRequest(req, fee);
 
-        uint256 winnerIndex = lastNumber;
-
-        emit RequestBytesFulfilled(request, winnerIndex);
+        emit RequestNumberSent(request);
     }
 
+    function addResultsFromAPI(uint256 _gameId) public {
+        Chainlink.Request memory req = buildChainlinkRequest(
+            jobIdMultipleNumbers,
+            address(this),
+            this.fulfillResults.selector
+        );
+        req.add("get", gamesAPI);
+        req.add("path", _gameId.toString());
+        lastGame = _gameId;
+        bytes32 request = sendOperatorRequest(req, fee);
+        emit RequestResultSent(request);        
+    }
+
+
+    function addGamesFromAPI() public {
+        Chainlink.Request memory req = buildChainlinkRequest(
+            jobIdBytes,
+            address(this),
+            this.fulfillBytesArray.selector
+        );
+
+        req.add("get", gamesAPI);
+        req.add("path", gameCount.toString());
+
+        bytes32 request = sendOperatorRequest(req, fee);
+
+        emit RequestBytesSent(request);
+    }
 
     function fulfillNumber(
         bytes32 _requestId,
         uint256 _number
     ) public recordChainlinkFulfillment(_requestId) {
-        emit RequestNumber(_requestId, _number);
+        
+        emit RequestNumberFulfilled(_requestId, _number);
         lastNumber = _number;
 
         if (_number != uint256(-1 ** 256)) {
@@ -267,15 +274,13 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         }
     }
 
-    function addGamesFromAPI() public {
-        Chainlink.Request memory req = buildChainlinkRequest(
-            jobIdBytes,
-            address(this),
-            this.fulfillBytesArray.selector
-        );
-        req.add("get", gamesAPI);
-        req.add("path", gameCount.toString());
-        sendOperatorRequest(req, fee);
+    function fulfillResults(
+        bytes32 requestId,
+        uint256 _teamA,
+        uint256 _teamB
+    ) public recordChainlinkFulfillment(requestId) {
+        emit RequestResultFulfilled(requestId, _teamA, _teamB);
+        updateGameScore(lastGame, _teamA, _teamB);
     }
 
     function fulfillBytesArray(
@@ -285,6 +290,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         emit RequestBytesFulfilled(requestId, _arrayOfBytes);
         addGame(_arrayOfBytes[0], _arrayOfBytes[1], _arrayOfBytes[2], _arrayOfBytes[3], _arrayOfBytes[4]);
     }
+
 
 
     function makeBet(uint256 _gameId, uint256 _homeScore, uint256 _awayScore, uint256 _USDCamount) public {
