@@ -6,6 +6,7 @@ import "@chainlink/contracts/src/v0.8/ChainlinkClient.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+// import "./dev/functions/FunctionsClient.sol";
 
 interface USDC {
     function balanceOf(address account) external view returns (uint256);
@@ -18,6 +19,7 @@ interface USDC {
 contract Sports is ChainlinkClient, Ownable, AccessControl{
     using Chainlink for Chainlink.Request;
     using Strings for uint256;
+    // using Functions for Functions.Request;
 
     // Game Variables
     mapping(uint256 => mapping(uint256 => Bet)) public betsByGame;
@@ -43,6 +45,10 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
     string public lastTeamA; //private, made public for testing
     string public lastTeamB; //private, made public for testing
     string public lastDate; //private, made public for testing
+
+    bytes32 public latestRequestId;
+    bytes public latestResponse;
+    bytes public latestError;
 
     // USDC Variables
     USDC public USDc;
@@ -89,7 +95,9 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
 
     struct Game {
         string homeTeam;
+        string homeTeamImage;
         string awayTeam;
+        string awayTeamImage;
         string gameTime;
         uint256 homeScore;
         uint256 awayScore;
@@ -100,6 +108,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
     }
 
     // Chainlink Events and Structs
+    event OCRResponse(bytes32 indexed requestId, bytes result, bytes err);
     event RequestNumber(bytes32 indexed requestId, uint256 number);
     event RequestSent(uint256 requestId, uint32 numWords);
     event RequestFulfilled(
@@ -107,11 +116,17 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         uint256 random
     );
 
-    event RequestMultipleFulfilled(
+    event RequestGames(
         bytes32 indexed requestId,
         string TeamA,
         string TeamB,
         string Date
+    );
+
+    event RequesResult(
+        bytes32 indexed requestId,
+        uint256 TeamA,
+        uint256 TeamB
     );
 
     struct RequestStatus {
@@ -158,27 +173,25 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         USDc = USDC(_usdcContractAddress);
     }
 
-
-    function addGame(string memory _homeTeam, string memory _awayTeam, string memory _gameTime) public isMod{ // it's internal, made public for testing
-        games[gameCount] = Game(_homeTeam, _awayTeam, _gameTime, 0, 0, false, 0, 0, 0);
+    function addGame(string memory _homeTeam, string memory _homeTeamImage, string memory _awayTeam, string memory _awayTeamImage, string memory _gameTime) public isMod{ // it's internal, made public for testing
+        games[gameCount] = Game(_homeTeam, _homeTeamImage, _awayTeamImage, _awayTeam, _gameTime, 0, 0, false, 0, 0, 0);
         gameCount++;
         emit GameCreated(_gameTime, _homeTeam, _awayTeam);
     }
 
     function updateGameScore(uint256 _gameId, uint256 _homeScore, uint256 _awayScore) public isMod{ // it's internal, made public for testing
         require(_gameId < gameCount, "Invalid game ID");
-        Game storage game = games[_gameId];
-        game.homeScore = _homeScore;
-        game.awayScore = _awayScore;
-        game.gameCompleted = true;
+        games[_gameId].homeScore = _homeScore;
+        games[_gameId].awayScore = _awayScore;
+        games[_gameId].gameCompleted = true;
 
-        if(game.betsCount == 0) {
+        if(games[_gameId].betsCount == 0) {
             return;
         }
 
         uint256 winnersSize = 0;
 
-        for (uint i = 0; i < game.betsCount; i++) {
+        for (uint i = 0; i < games[_gameId].betsCount; i++) {
             Bet storage bet = betsByGame[_gameId][i];
             if (bet.homeScore == _homeScore && bet.awayScore == _awayScore) {
                 winnersSize++;
@@ -186,12 +199,12 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         }
 
         Bet[] memory winners = new Bet[](winnersSize);
-        // Bet[] memory loosers = new Bet[](game.betsCount - winnersSize);
+        // Bet[] memory loosers = new Bet[](games[_gameId].betsCount - winnersSize);
         uint256 winnersCount = 0;
         uint256 loosersCount = 0;
         uint256 winnersBet = 0;
 
-        for (uint i = 0; i < game.betsCount; i++) {
+        for (uint i = 0; i < games[_gameId].betsCount; i++) {
             Bet storage bet = betsByGame[_gameId][i];
             if (bet.homeScore == _homeScore && bet.awayScore == _awayScore) {
                 bet.betWon = true;
@@ -207,18 +220,17 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         }
 
         if(winnersCount == 0) {
-            game.lotteryPool += game.betsAmount;
+            games[_gameId].lotteryPool += games[_gameId].betsAmount;
         }
 
         
         for (uint i = 0; i < winnersCount; i++) {
-            // payable(winners[i].user).transfer(game.betsAmount * winners[i].amount / winnersBet);
-            USDc.transfer(winners[i].user, game.betsAmount * winners[i].amount / winnersBet);
+            // payable(winners[i].user).transfer(games[_gameId].betsAmount * winners[i].amount / winnersBet);
+            USDc.transfer(winners[i].user, games[_gameId].betsAmount * winners[i].amount / winnersBet);
         }
 
         lastGame = _gameId;
         selectLotteryWinner(loosersCount);
-        
 
     }
 
@@ -231,9 +243,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
 
         string memory url = string(abi.encodePacked(numbersAPI, loosersQt.toString()));
         req.add("get", url);
-        
         req.add("path", "");
-
         req.addInt("times", 1);
 
         bytes32 request = sendChainlinkRequest(req, fee);
@@ -257,38 +267,36 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         }
     }
 
-    function addGamesFromAPI() public {
-    // Build the Chainlink request
-        Chainlink.Request memory req = buildChainlinkRequest(
-            jobIdStrings,
-            address(this),
-            this.fulfillGames.selector
-        );
+    // function addGamesFromAPI() public {
+    //     Functions.Request memory req;
 
-        // Set the API endpoint
-        req.add("get", gamesAPI);
+    //     req.initializeRequest(Functions.Location.Inline, Functions.CodeLanguage.JavaScript, source);
+    //     req.addArgs([gameCount]);
+        
 
-        // Set the path to the array of games
+    //     bytes32 assignedReqID = req.sendRequest(23432,99999);
+    //     latestRequestId = assignedReqID;
 
-        string memory TeamA = string(abi.encodePacked(gameCount.toString(), ",teamA"));
-        string memory TeamB = string(abi.encodePacked(gameCount.toString(), ",teamB"));
-        string memory Date = string(abi.encodePacked(gameCount.toString(), ",date"));
+    //     string memory TeamA = string(abi.encodePacked(gameCount.toString(), ",teamA"));
+    //     string memory TeamB = string(abi.encodePacked(gameCount.toString(), ",teamB"));
+    //     string memory Date = string(abi.encodePacked(gameCount.toString(), ",date"));
 
-        req.add("pathTEAMA", TeamA);
-        req.add("pathTEAMB", TeamB);
-        req.add("pathDATE", Date);
+    //     req.add("pathTEAMA", TeamA);
+    //     req.add("pathTEAMB", TeamB);
+    //     req.add("pathDATE", Date);
 
-        // Send the Chainlink request
-        sendChainlinkRequest(req, fee);
+    //     // Send the Chainlink request
+    //     sendChainlinkRequest(req, fee);
 
-        // Store the requestId for later use in the fulfillGames callback
-        // gameRequests[requestId] = true;
-}
+    //     // Store the requestId for later use in the fulfillGames callback
+    //     // gameRequests[requestId] = true;
+    // }
 
-    function fulfillGames(bytes32 _requestId, string memory _teamA, string memory _teamB, string memory _date) public recordChainlinkFulfillment(_requestId) {
-        emit RequestMultipleFulfilled(_requestId, _teamA, _teamB, _date);
-        addGame(_teamA, _teamB, _date);
-    }
+    // function fulfillGames(bytes32 _requestId, bytes memory _data) public fulfillRequest(_requestId) {
+    //     (string memory teamA, string memory teamB, string memory date) = abi.decode(_data, (string, string, string));
+    //     emit RequestGames(_requestId, teamA, teamB, date);
+    //     addGame(teamA, teamB, date);
+    // }
 
 
     function makeBet(uint256 _gameId, uint256 _homeScore, uint256 _awayScore, uint256 _USDCamount) public {
@@ -297,16 +305,15 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
 
         bool transactionSuccess = USDc.transferFrom(msg.sender, address(this), _USDCamount);
         require(transactionSuccess, "Transaction failed");
-        Game storage game = games[_gameId];
-        require(!game.gameCompleted, "Game has already completed");
+        require(!games[_gameId].gameCompleted, "Game has already completed");
 
         uint256 ownerFee = _USDCamount / 20;
         uint256 lotteryAmount = _USDCamount / 5;        
-        game.lotteryPool += lotteryAmount;
-        game.betsAmount += _USDCamount - ownerFee - lotteryAmount;
+        games[_gameId].lotteryPool += lotteryAmount;
+        games[_gameId].betsAmount += _USDCamount - ownerFee - lotteryAmount;
         
-        betsByGame[_gameId][game.betsCount] = Bet(msg.sender, _gameId, _USDCamount - ownerFee - lotteryAmount, _homeScore, _awayScore, false, false);
-        game.betsCount++;
+        betsByGame[_gameId][games[_gameId].betsCount] = Bet(msg.sender, _gameId, _USDCamount - ownerFee - lotteryAmount, _homeScore, _awayScore, false, false);
+        games[_gameId].betsCount++;
 
         
         emit BetCreated(_gameId, _homeScore, _awayScore);
