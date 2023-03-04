@@ -9,15 +9,21 @@ async function main() {
   // Get the ContractFactories and Signers here.
   const Sports = await ethers.getContractFactory("Sports");
   // deploy contracts
-  const sports = await Sports.deploy("0x326C977E6efc84E512bB9C30f76E30c160eD06FB", 
-    "0xCC79157eb46F5624204f47AB42b3906cAA40eaB7", 
+  const sports = await Sports.deploy(
+    "0x326c977e6efc84e512bb9c30f76e30c160ed06fb",
+    "0x40193c8518bb267228fc409a613bdbd8ec5a97b3",
     "0x6361393833363663633733313439353762386330313263373266303561656562",
-    "0x326C977E6efc84E512bB9C30f76E30c160eD06FB",
-    "0x07865c6E87B9F70255377e024ace6630C1Eaa37F",
-    [], 
-    ["0x3B02935B6717b012f8240AA3a3A1Be0eCD37B315"], 
+    "0x3764383061363338366566353433613361626235323831376636373037653362",
+    "0x326c977e6efc84e512bb9c30f76e30c160ed06fb",
+    "0x07865c6e87b9f70255377e024ace6630c1eaa37f",
+    [],
+    [
+      "0x3b02935b6717b012f8240aa3a3a1be0ecd37b315",
+      "0x929A4DfC610963246644b1A7f6D1aed40a27dD2f",
+    ],
     "https://www.random.org/integers/?num=1&min=1&col=1&base=10&format=plain&rnd=new&max=",
-    "https://www.random.org/integers/?num=1&min=1&col=1&base=10&format=plain&rnd=new&max=");
+    "https://nbamockapi-git-main-luizoamorim.vercel.app/upcoming-games"
+  );
   console.log("Contract address:", sports.address);
 
   // Save copies of each contracts abi and address to the frontend.

@@ -66,7 +66,7 @@ export default function MakeBet({ query }: any) {
         console.log("ADDRESS: ", address);
         const contract = new web3.eth.Contract(
             SportsABI.abi as any,
-            "0xF82e4671436707cD2b609a640c6Fc96DA8F5b27b",
+            "0xbe9D97d96126792607E17Af2E19d9F8673b69cB7",
         );
 
         console.log("CONTRATO: ", contract);
@@ -76,27 +76,14 @@ export default function MakeBet({ query }: any) {
             "0x0FA8781a83E46826621b3BC094Ea2A0212e71B23",
         );
 
-        console.log("usdcContract: ", usdcContract);
+        console.log("SO PARA TESTAR: ", toUSDC(parseFloat(inputBetValue)));
 
-        // Use the approve function to send USDC to the contract
-        const usdcTxn = await usdcContract.methods.approve(
-            "0x0FA8781a83E46826621b3BC094Ea2A0212e71B23",
-            toUSDC(parseFloat(inputBetValue)),
-        );
-
-        // Wait for the transaction to be mined
-        console.log("await usdcTxn.wait(): ", usdcTxn);
-        // const receipt = await web3.eth.getTransactionReceipt(
-        //     usdcTxn.transactionHash.toString(),
-        // );
+        const usdcTxn = await usdcContract.methods
+            .approve("0xbe9D97d96126792607E17Af2E19d9F8673b69cB7", 10000)
+            .send({ from: address });
 
         contract.methods
-            .makeBet(
-                obj.game?.gameId,
-                inputAValue,
-                inputBValue,
-                toUSDC(parseFloat(inputBetValue)),
-            )
+            .makeBet(obj.game?.gameId, inputAValue, inputBValue, 10000)
             .send({
                 from: address,
                 value: 0,
@@ -155,15 +142,15 @@ export default function MakeBet({ query }: any) {
                 </div>
             </div>
             <div
-                className="flex h-96 justify-around items-center w-full bg-no-repeat bg-cover bg-[url(../../public/assets/betEarn.svg)]"
+                className="flex h-96 justify-center p-10 w-full bg-no-repeat bg-cover bg-[url(../../public/assets/betEarn.svg)]"
                 style={{ height: "700px" }}
             >
                 <div className="w-3/12 h-5/12 flex flex-col justify-around items-center rounded-3xl bg-white p-3 hover:bg-inchworm px-24">
                     <div className="grid grid-cols-2 gap-4">
                         <div className="bg-gray-200 p-4">Item 1</div>
                         <div className="bg-gray-200 p-4">Item 2</div>
-                        <div className="bg-gray-200 p-4">{obj.game!.teamA}</div>
-                        <div className="bg-gray-200 p-4">{obj.game!.teamB}</div>
+                        <div className=" p-4">{obj.game!.teamA}</div>
+                        <div className=" p-4">{obj.game!.teamB}</div>
                     </div>
                     <div className="flex w-full justify-between items-center">
                         <input
@@ -200,33 +187,69 @@ export default function MakeBet({ query }: any) {
                         Bet Now
                     </div>
                 </div>
-                <div className="w-6/12 h-80 flex flex-col rounded-3xl bg-white p-6 hover:bg-inchworm">
-                    <p className="text-4xl font-bold">Bets History</p>
-                    <div className="flex mt-10 justify-around w-full border-b-2">
-                        <p className="flex justify-center items-center">
-                            Address
-                        </p>
-                        <p>Result</p>
-                        <p>Time</p>
-                        <p>Amont</p>
+                <div className="flex flex-col w-full items-center">
+                    <div className="w-10/12 h-60 mt-4 flex flex-col rounded-3xl bg-white p-6 hover:bg-inchworm">
+                        <p className="text-3xl font-bold">Bets History</p>
+                        <div className="flex mt-10 justify-around w-full border-b-2">
+                            <p className="flex justify-center items-center">
+                                Address
+                            </p>
+                            <p>Result</p>
+                            <p>Time</p>
+                            <p>Amont</p>
+                        </div>
+                        <div className="flex mt-4 justify-around w-full">
+                            <p>0x9d3da2b...de5f</p>
+                            <p>100 X 10</p>
+                            <p>03/01/2023 7pm</p>
+                            <p>1 USDC</p>
+                        </div>
+                        <div className="flex mt-4 justify-around w-full">
+                            <p>0x9d3da2b...de5f</p>
+                            <p>100 X 10</p>
+                            <p>03/01/2023 7pm</p>
+                            <p>1 USDC</p>
+                        </div>
+                        <div className="flex mt-4 justify-around w-full">
+                            <p>0x9d3da2b...de5f</p>
+                            <p>100 X 10</p>
+                            <p>03/01/2023 7pm</p>
+                            <p>1 USDC</p>
+                        </div>
                     </div>
-                    <div className="flex mt-4 justify-around w-full">
-                        <p>0x9d3da2b...de5f</p>
-                        <p>100 X 10</p>
-                        <p>03/01/2023 7pm</p>
-                        <p>1 USDC</p>
-                    </div>
-                    <div className="flex mt-4 justify-around w-full">
-                        <p>0x9d3da2b...de5f</p>
-                        <p>100 X 10</p>
-                        <p>03/01/2023 7pm</p>
-                        <p>1 USDC</p>
-                    </div>
-                    <div className="flex mt-4 justify-around w-full">
-                        <p>0x9d3da2b...de5f</p>
-                        <p>100 X 10</p>
-                        <p>03/01/2023 7pm</p>
-                        <p>1 USDC</p>
+                    <div className="w-full flex justify-center items-center mt-24">
+                        <div className="w-4/12 h-60 flex flex-col mr-24 rounded-3xl bg-white p-6 hover:bg-inchworm">
+                            <p className="text-3xl font-bold">
+                                Game Bet Winners
+                            </p>
+                            <div className="flex mt-10 justify-around w-full border-b-2">
+                                <p className="flex justify-center items-center">
+                                    Address
+                                </p>
+                            </div>
+                            <div className="flex mt-4 justify-around w-full">
+                                <p>0x9d3da2b...de5f</p>
+                            </div>
+                            <div className="flex mt-4 justify-around w-full">
+                                <p>0x9d3da2b...de5f</p>
+                            </div>
+                        </div>
+                        <div className="w-4/12 h-60 flex flex-col rounded-3xl bg-white p-6 hover:bg-inchworm">
+                            <p className="text-3xl font-bold">
+                                Lottery Winners
+                            </p>
+                            <div className="flex mt-10 justify-around w-full border-b-2">
+                                <p className="flex justify-center items-center">
+                                    Address
+                                </p>
+                            </div>
+                            <div className="flex mt-4 justify-around w-full">
+                                <p>0x9d3da2b...de5f</p>
+                            </div>
+                            <div className="flex mt-4 justify-around w-full">
+                                <p>0x9d3da2b...de5f</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
