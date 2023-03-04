@@ -28,6 +28,7 @@ export default function MakeBet({ query }: any) {
     const [inputBetValue, setInputBetValue] = useState("");
 
     useEffect(() => {
+        getBetsByGame();
         const storedAddress = localStorage.getItem("walletAddress");
         if (!storedAddress) {
             router.push("/login");
@@ -59,6 +60,31 @@ export default function MakeBet({ query }: any) {
         setInputBetValue(event.target.value);
     }
 
+    const getBetsByGame = async () => {
+        const web3 = new Web3(magic.rpcProvider as any);
+        const address = (await web3.eth.getAccounts())[0];
+        console.log("ADDRESS: ", address);
+        const contract = new web3.eth.Contract(
+            SportsABI.abi as any,
+            "0x2f648fc2445bB5F60E8A41Ea573a750455EcCab8",
+        );
+        let cont = 0;
+        let bets = [];
+        do {
+            cont++;
+            bets.push(
+                await contract.methods
+                    .betsByGame(obj.game?.gameId, cont)
+                    .call(),
+            );
+        } while (
+            (await contract.methods.betsByGame(obj.game?.gameId, cont)) ==
+            !undefined
+        );
+
+        console.log("BETS: ", bets);
+    };
+
     const makeBet = async () => {
         console.log("ENTRA!!");
         const web3 = new Web3(magic.rpcProvider as any);
@@ -66,7 +92,7 @@ export default function MakeBet({ query }: any) {
         console.log("ADDRESS: ", address);
         const contract = new web3.eth.Contract(
             SportsABI.abi as any,
-            "0xbe9D97d96126792607E17Af2E19d9F8673b69cB7",
+            "0x2f648fc2445bB5F60E8A41Ea573a750455EcCab8",
         );
 
         console.log("CONTRATO: ", contract);
@@ -79,7 +105,7 @@ export default function MakeBet({ query }: any) {
         console.log("SO PARA TESTAR: ", toUSDC(parseFloat(inputBetValue)));
 
         const usdcTxn = await usdcContract.methods
-            .approve("0xbe9D97d96126792607E17Af2E19d9F8673b69cB7", 10000)
+            .approve("0x2f648fc2445bB5F60E8A41Ea573a750455EcCab8", 10000)
             .send({ from: address });
 
         contract.methods
@@ -143,7 +169,7 @@ export default function MakeBet({ query }: any) {
             </div>
             <div
                 className="flex h-96 justify-center p-10 w-full bg-no-repeat bg-cover bg-[url(../../public/assets/betEarn.svg)]"
-                style={{ height: "700px" }}
+                style={{ height: "100%" }}
             >
                 <div className="w-3/12 h-5/12 flex flex-col justify-around items-center rounded-3xl bg-white p-3 hover:bg-inchworm px-24">
                     <div className="grid grid-cols-2 gap-4">
@@ -204,18 +230,6 @@ export default function MakeBet({ query }: any) {
                             <p>03/01/2023 7pm</p>
                             <p>1 USDC</p>
                         </div>
-                        <div className="flex mt-4 justify-around w-full">
-                            <p>0x9d3da2b...de5f</p>
-                            <p>100 X 10</p>
-                            <p>03/01/2023 7pm</p>
-                            <p>1 USDC</p>
-                        </div>
-                        <div className="flex mt-4 justify-around w-full">
-                            <p>0x9d3da2b...de5f</p>
-                            <p>100 X 10</p>
-                            <p>03/01/2023 7pm</p>
-                            <p>1 USDC</p>
-                        </div>
                     </div>
                     <div className="w-full flex justify-center items-center mt-24">
                         <div className="w-4/12 h-60 flex flex-col mr-24 rounded-3xl bg-white p-6 hover:bg-inchworm">
@@ -253,10 +267,6 @@ export default function MakeBet({ query }: any) {
                     </div>
                 </div>
             </div>
-            <div
-                className="p-8 bg-appred-250 flex items-center justify-between"
-                style={{ height: "150px" }}
-            ></div>
         </div>
     );
 }

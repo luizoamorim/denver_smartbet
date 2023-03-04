@@ -34,7 +34,7 @@ export default function Home(props: any) {
         console.log("ADDRESS: ", address);
         const contract = new web3.eth.Contract(
             SportsABI.abi as any,
-            "0xbe9D97d96126792607E17Af2E19d9F8673b69cB7",
+            "0x2f648fc2445bB5F60E8A41Ea573a750455EcCab8",
         );
 
         const homeTeam = "New York Yankees";
@@ -57,7 +57,7 @@ export default function Home(props: any) {
         console.log("ADDRESS: ", address);
         const contract = new web3.eth.Contract(
             SportsABI.abi as any,
-            "0xbe9D97d96126792607E17Af2E19d9F8673b69cB7",
+            "0x2f648fc2445bB5F60E8A41Ea573a750455EcCab8",
         );
 
         let cont = 0;
@@ -78,7 +78,7 @@ export default function Home(props: any) {
         console.log("ADDRESS: ", address);
         const contract = new web3.eth.Contract(
             SportsABI.abi as any,
-            "0xbe9D97d96126792607E17Af2E19d9F8673b69cB7",
+            "0x2f648fc2445bB5F60E8A41Ea573a750455EcCab8",
         );
         console.log("CONTRACT: ", contract);
         // const signer = await provider.getSigner();
@@ -176,7 +176,7 @@ export async function getServerSideProps() {
 
     const contract = new web3.eth.Contract(
         SportsABI.abi as any,
-        "0xbe9D97d96126792607E17Af2E19d9F8673b69cB7",
+        "0x2f648fc2445bB5F60E8A41Ea573a750455EcCab8",
     );
 
     let cont = 0;
