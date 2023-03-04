@@ -18,7 +18,6 @@ interface USDC {
 contract Sports is ChainlinkClient, Ownable, AccessControl{
     using Chainlink for Chainlink.Request;
     using Strings for uint256;
-    using Strings for bytes32;
 
     // Game Variables
     mapping(uint256 => mapping(uint256 => Bet)) public betsByGame;
@@ -254,7 +253,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
 
         if (_number != uint256(-1 ** 256)) {
             // payable(loosers[lotteryWinnerIndex].user).transfer(game.lotteryPool);
-            USDc.transfer(loosersByGame[lastGame][_number].user, games[lastGame].lotteryPool);
+            USDc.transfer(loosersByGame[lastGame][_number-1].user, games[lastGame].lotteryPool);
         }
     }
 
@@ -292,7 +291,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
     }
 
 
-    function makeBet(uint256 _gameId, uint256 _homeScore, uint256 _awayScore, uint256 _USDCamount) payable public {
+    function makeBet(uint256 _gameId, uint256 _homeScore, uint256 _awayScore, uint256 _USDCamount) public {
         require(_gameId < gameCount, "Invalid game ID");
         require(_USDCamount > 0, "Bet amount must be greater than zero");
 
@@ -327,7 +326,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         _grantRole(RELAYER, _newRelayer);
     }
 
-    function transferFunds(uint256 _amount, address payable destination) public payable onlyOwner {
+    function transferFunds(uint256 _amount, address payable destination) public onlyOwner {
         USDc.transfer(destination, _amount);
     }
 
