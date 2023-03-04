@@ -33,7 +33,7 @@ export default function Home() {
 
     const makeBet = async () => {
         // const provider = new ethers.JsonRpcProvider(
-        //   `https://goerli.infura.io/v3/${myInfuraId}`
+        //   `https://polygon-mumbai.infura.io/v3/${myInfuraId}`
         // );
 
         const web3 = new Web3(magic.rpcProvider);

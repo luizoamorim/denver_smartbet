@@ -2,18 +2,38 @@ import Image from "next/image";
 import logo from "../../public/assets/logo.svg";
 import { useEffect, useState } from "react";
 import SportsABI from "../../artifacts/contracts/Sports.sol/Sports.json";
+import USDCABI from "../utils/abis/USDC.json";
 import Web3 from "web3";
 import magic from "../utils/magic";
 import { useRouter } from "next/router";
+import ethers from "ethers";
 
-export default function MakeBet() {
+interface GameCardProps {
+    gameId: number;
+    date: string;
+    teamA: string;
+    teamB: string;
+    betQt: string;
+}
+
+function toUSDC(num: number): number {
+    return num * 10 ** 6;
+}
+
+function fromUSDC(num: number): number {
+    return num / 10 ** 6;
+}
+export default function MakeBet({ query, bets }: any) {
+    const obj = JSON.parse(query.obj);
     const [address, setAddress] = useState("");
     const router = useRouter();
     const [inputAValue, setInputAValue] = useState("");
     const [inputBValue, setInputBValue] = useState("");
     const [inputBetValue, setInputBetValue] = useState("");
+    const [stateBets, setStateBets] = useState(bets);
 
     useEffect(() => {
+        // getBetsByGame();
         const storedAddress = localStorage.getItem("walletAddress");
         if (!storedAddress) {
             router.push("/login");
@@ -45,27 +65,72 @@ export default function MakeBet() {
         setInputBetValue(event.target.value);
     }
 
-    const makeBet = async () => {
+    const getBetsByGame = async () => {
         const web3 = new Web3(magic.rpcProvider as any);
         const address = (await web3.eth.getAccounts())[0];
         console.log("ADDRESS: ", address);
         const contract = new web3.eth.Contract(
             SportsABI.abi as any,
-            "0x2397FE9f5e4eeC692B7af2c08728B5D02c7a7c9a",
+            "0x2f648fc2445bB5F60E8A41Ea573a750455EcCab8",
         );
-        console.log("CONTRACT: ", contract);
-        // const signer = await provider.getSigner();
-        // console.log("SIGNER TYPE: ", typeof signer);
-        // console.log("SIGNER: ", signer);
-        // const contract = new ethers.Contract(
-        //     "0x2397FE9f5e4eeC692B7af2c08728B5D02c7a7c9a",
-        //     SportsABI,
-        //     magic.rpcProvider,
-        // );
+        let cont = 0;
+        let bets = [];
+        do {
+            cont++;
+            bets.push(
+                await contract.methods
+                    .betsByGame(obj.game?.gameId, cont)
+                    .call(),
+            );
+        } while (
+            (await contract.methods.betsByGame(obj.game?.gameId, cont)) ==
+            !undefined
+        );
+
+        console.log("BETS: ", bets);
+    };
+
+    const makeBet = async () => {
+        console.log("ENTRA!!");
+        const web3 = new Web3(magic.rpcProvider as any);
+        const address = (await web3.eth.getAccounts())[0];
+        console.log("ADDRESS: ", address);
+        const contract = new web3.eth.Contract(
+            SportsABI.abi as any,
+            "0x2f648fc2445bB5F60E8A41Ea573a750455EcCab8",
+        );
+
+        console.log("CONTRATO: ", contract);
+
+        const usdcContract = new web3.eth.Contract(
+            USDCABI as any,
+            "0x0FA8781a83E46826621b3BC094Ea2A0212e71B23",
+        );
+
+        console.log("SO PARA TESTAR: ", toUSDC(parseFloat(inputBetValue)));
+
+        const usdcTxn = await usdcContract.methods
+            .approve("0x2f648fc2445bB5F60E8A41Ea573a750455EcCab8", 10000)
+            .send({ from: address });
+
+        contract.methods
+            .makeBet(obj.game?.gameId, inputAValue, inputBValue, 10000)
+            .send({
+                from: address,
+                value: 0,
+                gasPrice: web3.utils.toWei("10", "gwei"),
+                gasLimit: 300000,
+            })
+            .then((receipt: any) => {
+                console.log("Transaction receipt:", receipt);
+            })
+            .catch((error: any) => {
+                console.error("Error:", error);
+            });
     };
     return (
-        <div className="">
-            <div className="w-full h-32 p-8 bg-appred-100 flex items-center justify-between">
+        <div style={{ height: "100%" }}>
+            <div className="w-full h-32 p-8 bg-appred-250 flex items-center justify-between">
                 <div>
                     <Image
                         src={logo}
@@ -107,13 +172,16 @@ export default function MakeBet() {
                     </div>
                 </div>
             </div>
-            <div className="flex h-96 justify-around items-center w-full bg-no-repeat bg-cover bg-[url(../../public/assets/betEarn.svg)]">
+            <div
+                className="flex h-96 justify-center p-10 w-full bg-no-repeat bg-cover bg-[url(../../public/assets/betEarn.svg)]"
+                style={{ height: "100%" }}
+            >
                 <div className="w-3/12 h-5/12 flex flex-col justify-around items-center rounded-3xl bg-white p-3 hover:bg-inchworm px-24">
                     <div className="grid grid-cols-2 gap-4">
                         <div className="bg-gray-200 p-4">Item 1</div>
                         <div className="bg-gray-200 p-4">Item 2</div>
-                        <div className="bg-gray-200 p-4">Item 3</div>
-                        <div className="bg-gray-200 p-4">Item 4</div>
+                        <div className=" p-4">{obj.game!.teamA}</div>
+                        <div className=" p-4">{obj.game!.teamB}</div>
                     </div>
                     <div className="flex w-full justify-between items-center">
                         <input
@@ -145,40 +213,113 @@ export default function MakeBet() {
                     <div
                         className="bg-appred-200 w-72 h-9 flex justify-center items-center text-white
            font-bold rounded-md hover:bg-appred-250 hover:cursor-pointer"
+                        onClick={() => makeBet()}
                     >
                         Bet Now
                     </div>
                 </div>
-                <div className="w-6/12 h-80 flex flex-col rounded-3xl bg-white p-6 hover:bg-inchworm">
-                    <p className="text-4xl font-bold">Bets History</p>
-                    <div className="flex mt-10 justify-around w-full border-b-2">
-                        <p className="flex justify-center items-center">
-                            Address
-                        </p>
-                        <p>Result</p>
-                        <p>Time</p>
-                        <p>Amont</p>
+                <div className="flex flex-col w-full items-center">
+                    <div className="w-10/12 h-60 mt-4 flex flex-col rounded-3xl bg-white p-6 hover:bg-inchworm">
+                        <p className="text-3xl font-bold">Bets History</p>
+                        <div className="flex mt-10 justify-around w-full border-b-2">
+                            <p className="flex justify-center items-center">
+                                Address
+                            </p>
+                            <p>Result</p>
+                            <p>Amont</p>
+                        </div>
+                        {stateBets && (
+                            <div className="flex mt-4 justify-around w-full">
+                                <p>
+                                    {stateBets[0].user.slice(0, 5)}...
+                                    {stateBets[0].user.slice(
+                                        stateBets[0].user.length - 4,
+                                        stateBets[0].user.length,
+                                    )}
+                                </p>
+                                <p>
+                                    {stateBets[0].homeScore} X{" "}
+                                    {stateBets[0].awayScore}
+                                </p>
+                                <p>
+                                    {fromUSDC(parseFloat(stateBets[0].amount))}{" "}
+                                    USDC
+                                </p>
+                            </div>
+                        )}
+                        {!stateBets && (
+                            <div className="flex mt-4 justify-around w-full">
+                                <p>Loading ...</p>
+                            </div>
+                        )}
                     </div>
-                    <div className="flex mt-4 justify-around w-full">
-                        <p>0x9d3da2b...de5f</p>
-                        <p>100 X 10</p>
-                        <p>03/01/2023 7pm</p>
-                        <p>1 USDC</p>
-                    </div>
-                    <div className="flex mt-4 justify-around w-full">
-                        <p>0x9d3da2b...de5f</p>
-                        <p>100 X 10</p>
-                        <p>03/01/2023 7pm</p>
-                        <p>1 USDC</p>
-                    </div>
-                    <div className="flex mt-4 justify-around w-full">
-                        <p>0x9d3da2b...de5f</p>
-                        <p>100 X 10</p>
-                        <p>03/01/2023 7pm</p>
-                        <p>1 USDC</p>
+                    <div className="w-full flex justify-center items-center mt-24">
+                        <div className="w-4/12 h-60 flex flex-col mr-24 rounded-3xl bg-white p-6 hover:bg-inchworm">
+                            <p className="text-3xl font-bold">
+                                Game Bet Winners
+                            </p>
+                            <div className="flex mt-10 justify-around w-full border-b-2">
+                                <p className="flex justify-center items-center">
+                                    Address
+                                </p>
+                            </div>
+                            <div className="flex mt-4 justify-around w-full">
+                                <p>0x9d3da2b...de5f</p>
+                            </div>
+                            <div className="flex mt-4 justify-around w-full">
+                                <p>0x9d3da2b...de5f</p>
+                            </div>
+                        </div>
+                        <div className="w-4/12 h-60 flex flex-col rounded-3xl bg-white p-6 hover:bg-inchworm">
+                            <p className="text-3xl font-bold">
+                                Lottery Winners
+                            </p>
+                            <div className="flex mt-10 justify-around w-full border-b-2">
+                                <p className="flex justify-center items-center">
+                                    Address
+                                </p>
+                            </div>
+                            <div className="flex mt-4 justify-around w-full">
+                                <p>0x9d3da2b...de5f</p>
+                            </div>
+                            <div className="flex mt-4 justify-around w-full">
+                                <p>0x9d3da2b...de5f</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     );
+}
+
+export async function getServerSideProps(context: any) {
+    const web3 = new Web3(
+        `https://polygon-mumbai.infura.io/v3/${process.env.NEXT_PUBLIC_INFURA_ID}`,
+    );
+
+    const contract = new web3.eth.Contract(
+        SportsABI.abi as any,
+        "0x2f648fc2445bB5F60E8A41Ea573a750455EcCab8",
+    );
+
+    const obj = JSON.parse(context.query.obj);
+    let cont = 0;
+    let bets = [];
+    do {
+        cont++;
+        bets.push(
+            await contract.methods.betsByGame(obj.game?.gameId, cont).call(),
+        );
+    } while (
+        (await contract.methods.betsByGame(obj.game?.gameId, cont)).call() ==
+        !undefined
+    );
+
+    return {
+        props: {
+            query: context.query,
+            bets: JSON.parse(JSON.stringify(bets)),
+        },
+    };
 }

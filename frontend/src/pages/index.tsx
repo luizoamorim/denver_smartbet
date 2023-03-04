@@ -4,9 +4,11 @@ import { useEffect, useState } from "react";
 import SportsABI from "../../artifacts/contracts/Sports.sol/Sports.json";
 import Web3 from "web3";
 import magic from "../utils/magic";
+import GameCard from "@/components/gameCard";
 
-export default function Home() {
+export default function Home(props: any) {
     const [address, setAddress] = useState("");
+    const [games, setGames] = useState([]);
 
     useEffect(() => {
         const storedAddress = localStorage.getItem("walletAddress");
@@ -26,13 +28,57 @@ export default function Home() {
         setAddress("");
     };
 
+    const createGame = async () => {
+        const web3 = new Web3(magic.rpcProvider as any);
+        const address = (await web3.eth.getAccounts())[0];
+        console.log("ADDRESS: ", address);
+        const contract = new web3.eth.Contract(
+            SportsABI.abi as any,
+            "0x2f648fc2445bB5F60E8A41Ea573a750455EcCab8",
+        );
+
+        const homeTeam = "New York Yankees";
+        const awayTeam = "Boston Red Sox";
+        const gameTime = 1646350800; // March 3, 2023 8:00:00 PM (UTC)
+        contract.methods
+            .addGame(homeTeam, awayTeam, gameTime)
+            .send({ from: "0x929a4dfc610963246644b1a7f6d1aed40a27dd2f" })
+            .then((receipt: any) => {
+                console.log("OK: ", receipt);
+            })
+            .catch((error: any) => {
+                console.log("Error: ", error);
+            });
+    };
+
+    const showGame = async () => {
+        const web3 = new Web3(magic.rpcProvider as any);
+        const address = (await web3.eth.getAccounts())[0];
+        console.log("ADDRESS: ", address);
+        const contract = new web3.eth.Contract(
+            SportsABI.abi as any,
+            "0x2f648fc2445bB5F60E8A41Ea573a750455EcCab8",
+        );
+
+        let cont = 0;
+        let games: any[] = [];
+        do {
+            games.push(await contract.methods.games(cont).call());
+            cont++;
+        } while (
+            (await contract.methods.games(cont).call()).homeTeam.length !== 0
+        );
+
+        setGames(games as any);
+    };
+
     const makeBet = async () => {
         const web3 = new Web3(magic.rpcProvider as any);
         const address = (await web3.eth.getAccounts())[0];
         console.log("ADDRESS: ", address);
         const contract = new web3.eth.Contract(
             SportsABI.abi as any,
-            "0x2397FE9f5e4eeC692B7af2c08728B5D02c7a7c9a",
+            "0x2f648fc2445bB5F60E8A41Ea573a750455EcCab8",
         );
         console.log("CONTRACT: ", contract);
         // const signer = await provider.getSigner();
@@ -44,9 +90,20 @@ export default function Home() {
         //     magic.rpcProvider,
         // );
     };
+
+    const itemList = props.games.map((game: any, index: number) => (
+        <GameCard
+            gameId={index}
+            teamA={game.homeTeam}
+            teamB={game.awayTeam}
+            date={game.gameTime}
+            betQt={game.betsCount}
+        />
+    ));
+
     return (
-        <div>
-            <div className="w-full h-32 p-8 bg-appred-100 flex items-center justify-between">
+        <div style={{ height: "100%" }}>
+            <div className="h-32 p-8 bg-appred-200 flex items-center justify-between">
                 <div>
                     <Image
                         src={logo}
@@ -86,23 +143,52 @@ export default function Home() {
                     >
                         Bet
                     </div>
+                    <div
+                        className="bg-blue-700 hover:cursor-pointer w-14 h-14 ml-2 rounded flex items-center justify-center text-white"
+                        onClick={() => createGame()}
+                    >
+                        Create Game
+                    </div>
+                    <div
+                        className="bg-blue-700 hover:cursor-pointer w-14 h-14 ml-2 rounded flex items-center justify-center text-white"
+                        onClick={() => showGame()}
+                    >
+                        Show Game
+                    </div>
                 </div>
             </div>
-            <div className="flex justify-center items-center w-full h-96 bg-no-repeat bg-cover bg-[url(../../public/assets/betEarn.svg)]">
-                <div className="w-80 h-80 max-w-xs flex flex-col justify-around items-center rounded-3xl bg-white p-3 hover:bg-inchworm">
-                    <div className="text-black text-sm font-bold">
-                        Today 5:30 pm
-                    </div>
-                    <div>Team A X Team B</div>
-                    <div
-                        className="bg-appred-200 w-72 h-9 flex justify-center items-center text-white
-           font-bold rounded-md hover:bg-appred-250 hover:cursor-pointer"
-                    >
-                        Bet Now
-                    </div>
-                    <div>100 bets</div>
-                </div>
+            <div
+                style={{ height: "100%" }}
+                className="flex justify-center items-center w-full py-10 bg-no-repeat bg-cover bg-[url(../../public/assets/betEarn.svg)]"
+            >
+                <div className="grid grid-cols-4 gap-4">{itemList}</div>
             </div>
         </div>
     );
+}
+
+export async function getServerSideProps() {
+    // Connect to the Ethereum network
+
+    const web3 = new Web3(
+        `https://polygon-mumbai.infura.io/v3/${process.env.NEXT_PUBLIC_INFURA_ID}`,
+    );
+
+    const contract = new web3.eth.Contract(
+        SportsABI.abi as any,
+        "0x2f648fc2445bB5F60E8A41Ea573a750455EcCab8",
+    );
+
+    let cont = 0;
+    let games: any[] = [];
+    do {
+        games.push(await contract.methods.games(cont).call());
+        cont++;
+    } while ((await contract.methods.games(cont).call()).homeTeam.length !== 0);
+
+    return {
+        props: {
+            games: JSON.parse(JSON.stringify(games)),
+        },
+    };
 }
