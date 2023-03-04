@@ -38,17 +38,14 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
 
     // Chainlink Variables
     bytes32 private jobIdNumbers;
-    bytes32 private jobIdStrings;
+    bytes32 private jobIdBytes;
+    bytes32 private jobIdMultipleNumbers;
     uint256 private fee;
     uint256 public lastNumber; //private, made public for testing
     uint256 public lastGame; //private, made public for testing
-    string public lastTeamA; //private, made public for testing
-    string public lastTeamB; //private, made public for testing
-    string public lastDate; //private, made public for testing
-
-    bytes32 public latestRequestId;
-    bytes public latestResponse;
-    bytes public latestError;
+    bytes32 public lastTeamA; //private, made public for testing
+    bytes32 public lastTeamB; //private, made public for testing
+    bytes32 public lastDate; //private, made public for testing
 
     // USDC Variables
     USDC public USDc;
@@ -78,9 +75,9 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
     );
 
     event GameCreated(
-        string _gameTime,
-        string indexed _homeTeam,
-        string indexed _awayTeam
+        bytes _gameTime,
+        bytes indexed _homeTeam,
+        bytes indexed _awayTeam
     );
 
     struct Bet {
@@ -94,11 +91,11 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
     }
 
     struct Game {
-        string homeTeam;
-        string homeTeamImage;
-        string awayTeam;
-        string awayTeamImage;
-        string gameTime;
+        bytes homeTeam;
+        bytes homeTeamImage;
+        bytes awayTeam;
+        bytes awayTeamImage;
+        bytes gameTime;
         uint256 homeScore;
         uint256 awayScore;
         bool gameCompleted;        
@@ -108,19 +105,20 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
     }
 
     // Chainlink Events and Structs
-    event OCRResponse(bytes32 indexed requestId, bytes result, bytes err);
     event RequestNumber(bytes32 indexed requestId, uint256 number);
     event RequestSent(uint256 requestId, uint32 numWords);
-    event RequestFulfilled(
-        bytes32 requestId,
+    event RequestBytesFulfilled(
+        bytes32 indexed requestId,
         uint256 random
     );
+    event RequestBytesFulfilled(bytes32 indexed requestId, bytes[] indexed data);
+
 
     event RequestGames(
         bytes32 indexed requestId,
-        string TeamA,
-        string TeamB,
-        string Date
+        bytes TeamA,
+        bytes TeamB,
+        bytes Date
     );
 
     event RequesResult(
@@ -138,7 +136,8 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         address _chainlinkToken,
         address _chainlinkOracle,
         bytes32 _jobIdNumbers,
-        bytes32 _jobIdStrings,
+        bytes32 _jobIdMultipleNumbers,
+        bytes32 _jobIdBytes,
         address _relayer,
         address _usdcContractAddress,
         address[] memory _mods,
@@ -165,15 +164,16 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         // Chainlink construct
         setChainlinkToken(_chainlinkToken);
         setChainlinkOracle(_chainlinkOracle);
-        jobIdNumbers = _jobIdNumbers; // por algum motivo n funciona sem jobIdNumbers hardcoded
-        jobIdStrings = _jobIdStrings; // por algum motivo n funciona sem _jobIdStrings hardcoded
+        jobIdNumbers = _jobIdNumbers; 
+        jobIdBytes = _jobIdBytes;
+        jobIdMultipleNumbers = _jobIdMultipleNumbers;
         fee = (1 * LINK_DIVISIBILITY) / 10; // 0,1 * 10**18 (Varies by network and job)
 
         // USDC Construct
         USDc = USDC(_usdcContractAddress);
     }
 
-    function addGame(string memory _homeTeam, string memory _homeTeamImage, string memory _awayTeam, string memory _awayTeamImage, string memory _gameTime) public isMod{ // it's internal, made public for testing
+    function addGame(bytes memory _homeTeam, bytes memory _homeTeamImage, bytes memory _awayTeam, bytes memory _awayTeamImage, bytes memory _gameTime) public isMod{ // it's internal, made public for testing
         games[gameCount] = Game(_homeTeam, _homeTeamImage, _awayTeamImage, _awayTeam, _gameTime, 0, 0, false, 0, 0, 0);
         gameCount++;
         emit GameCreated(_gameTime, _homeTeam, _awayTeam);
@@ -250,7 +250,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
 
         uint256 winnerIndex = lastNumber;
 
-        emit RequestFulfilled(request, winnerIndex);
+        emit RequestBytesFulfilled(request, winnerIndex);
     }
 
 
@@ -267,36 +267,24 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         }
     }
 
-    // function addGamesFromAPI() public {
-    //     Functions.Request memory req;
+    function addGamesFromAPI() public {
+        Chainlink.Request memory req = buildChainlinkRequest(
+            jobIdBytes,
+            address(this),
+            this.fulfillBytesArray.selector
+        );
+        req.add("get", gamesAPI);
+        req.add("path", gameCount.toString());
+        sendOperatorRequest(req, fee);
+    }
 
-    //     req.initializeRequest(Functions.Location.Inline, Functions.CodeLanguage.JavaScript, source);
-    //     req.addArgs([gameCount]);
-        
-
-    //     bytes32 assignedReqID = req.sendRequest(23432,99999);
-    //     latestRequestId = assignedReqID;
-
-    //     string memory TeamA = string(abi.encodePacked(gameCount.toString(), ",teamA"));
-    //     string memory TeamB = string(abi.encodePacked(gameCount.toString(), ",teamB"));
-    //     string memory Date = string(abi.encodePacked(gameCount.toString(), ",date"));
-
-    //     req.add("pathTEAMA", TeamA);
-    //     req.add("pathTEAMB", TeamB);
-    //     req.add("pathDATE", Date);
-
-    //     // Send the Chainlink request
-    //     sendChainlinkRequest(req, fee);
-
-    //     // Store the requestId for later use in the fulfillGames callback
-    //     // gameRequests[requestId] = true;
-    // }
-
-    // function fulfillGames(bytes32 _requestId, bytes memory _data) public fulfillRequest(_requestId) {
-    //     (string memory teamA, string memory teamB, string memory date) = abi.decode(_data, (string, string, string));
-    //     emit RequestGames(_requestId, teamA, teamB, date);
-    //     addGame(teamA, teamB, date);
-    // }
+    function fulfillBytesArray(
+        bytes32 requestId,
+        bytes[] memory _arrayOfBytes
+    ) public recordChainlinkFulfillment(requestId) {
+        emit RequestBytesFulfilled(requestId, _arrayOfBytes);
+        addGame(_arrayOfBytes[0], _arrayOfBytes[1], _arrayOfBytes[2], _arrayOfBytes[3], _arrayOfBytes[4]);
+    }
 
 
     function makeBet(uint256 _gameId, uint256 _homeScore, uint256 _awayScore, uint256 _USDCamount) public {
