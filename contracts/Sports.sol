@@ -22,6 +22,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
 
     // Game Variables
     mapping(uint256 => mapping(uint256 => Bet)) public betsByGame;
+    mapping(uint256 => mapping(uint256 => Bet)) public loosersByGame;
     mapping(uint256 => Game) public games;
 
     uint256 public gameCount;
@@ -39,6 +40,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
     bytes32 private jobIdStrings;
     uint256 private fee;
     uint256 public lastNumber; //private, made public for testing
+    uint256 public lastGame; //private, made public for testing
     string public lastTeamA; //private, made public for testing
     string public lastTeamB; //private, made public for testing
     string public lastDate; //private, made public for testing
@@ -105,6 +107,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         bytes32 requestId,
         uint256 random
     );
+
     event RequestMultipleFulfilled(
         bytes32 indexed requestId,
         string TeamA,
@@ -184,7 +187,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         }
 
         Bet[] memory winners = new Bet[](winnersSize);
-        Bet[] memory loosers = new Bet[](game.betsCount - winnersSize);
+        // Bet[] memory loosers = new Bet[](game.betsCount - winnersSize);
         uint256 winnersCount = 0;
         uint256 loosersCount = 0;
         uint256 winnersBet = 0;
@@ -198,7 +201,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
                 winnersBet += bet.amount;
                 winnersCount++;
             } else {
-                loosers[loosersCount] = (bet);
+                loosersByGame[_gameId][loosersCount] = (bet);
                 loosersCount++;
             }
             bet.betCompleted = true;
@@ -214,15 +217,13 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
             USDc.transfer(winners[i].user, game.betsAmount * winners[i].amount / winnersBet);
         }
 
-        uint256 lotteryWinnerIndex = selectLotteryWinner(loosersCount);
-        if (lotteryWinnerIndex != uint256(-1 ** 256)) {
-            // payable(loosers[lotteryWinnerIndex].user).transfer(game.lotteryPool);
-            USDc.transfer(loosers[lotteryWinnerIndex].user, game.lotteryPool);
-        }
+        lastGame = _gameId;
+        selectLotteryWinner(loosersCount);
+        
 
     }
 
-    function selectLotteryWinner(uint256 loosersQt) public returns (uint256) { //internal, made public for testing
+    function selectLotteryWinner(uint256 loosersQt) public { //internal, made public for testing
         Chainlink.Request memory req = buildChainlinkRequest(
             jobIdNumbers,
             address(this),
@@ -241,8 +242,6 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         uint256 winnerIndex = lastNumber;
 
         emit RequestFulfilled(request, winnerIndex);
-        
-        return winnerIndex;
     }
 
 
@@ -252,6 +251,11 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
     ) public recordChainlinkFulfillment(_requestId) {
         emit RequestNumber(_requestId, _number);
         lastNumber = _number;
+
+        if (_number != uint256(-1 ** 256)) {
+            // payable(loosers[lotteryWinnerIndex].user).transfer(game.lotteryPool);
+            USDc.transfer(loosersByGame[lastGame][_number].user, games[lastGame].lotteryPool);
+        }
     }
 
     function addGamesFromAPI() public {
@@ -267,8 +271,8 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
 
         // Set the path to the array of games
 
-        string memory TeamA = string(abi.encodePacked(gameCount.toString(), ",TeamA"));
-        string memory TeamB = string(abi.encodePacked(gameCount.toString(), ",TeamB"));
+        string memory TeamA = string(abi.encodePacked(gameCount.toString(), ",teamA"));
+        string memory TeamB = string(abi.encodePacked(gameCount.toString(), ",teamB"));
         string memory Date = string(abi.encodePacked(gameCount.toString(), ",date"));
 
         req.add("pathTEAMA", TeamA);
