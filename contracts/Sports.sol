@@ -8,8 +8,8 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 interface USDC {
-    function balanceOf(address account) external view returns (uint256);
-    function allowance(address owner, address spender) external view returns (uint256);
+    // function balanceOf(address account) external view returns (uint256);
+    // function allowance(address owner, address spender) external view returns (uint256);
     function transfer(address recipient, uint256 amount) external returns (bool);
     function approve(address spender, uint256 amount) external returns (bool);
     function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
@@ -42,9 +42,6 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
     uint256 private fee;
     uint256 private lastNumber;
     uint256 private lastGame;
-    bytes32 private lastTeamA;
-    bytes32 private lastTeamB;
-    bytes32 private lastDate;
 
     // USDC Variables
     USDC public USDc;
@@ -121,8 +118,9 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         address _usdcContractAddress,
         address[] memory _mods,
         address[] memory _admins,
-        string memory _numbersAPI, 
-        string memory _gamesAPI) {
+        string[] memory _API
+        // string memory _resultsAPI
+        ) {
 
         // Chainlink construct
         setChainlinkToken(_chainlinkToken);
@@ -146,8 +144,9 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
 
         _grantRole(RELAYER, _relayer);
 
-        numbersAPI = _numbersAPI;
-        gamesAPI = _gamesAPI;
+        numbersAPI = _API[0];
+        gamesAPI = _API[1];
+        resultsAPI = _API[2];
     }
 
     // User Function
@@ -178,15 +177,14 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
 
     // Chainlink Functions
 
-    function selectLotteryWinner(uint256 loosersQt) public { //internal, made public for testing
+    function selectLotteryWinner(uint256 loosersQt) internal {
         Chainlink.Request memory req = buildChainlinkRequest(
             jobIdNumbers,
             address(this),
             this.fulfillNumber.selector
         );
 
-        string memory url = string(abi.encodePacked(numbersAPI, loosersQt.toString()));
-        req.add("get", url);
+        req.add("get", string(abi.encodePacked(numbersAPI, loosersQt.toString())));
         req.add("path", "");
         req.addInt("times", 1);
 
@@ -195,14 +193,15 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         emit RequestNumberSent(request);
     }
 
-    function addResultsFromAPI(uint256 _gameId) public {
+    function addResultsFromAPI(uint256 _gameId) public isRelayer{
         Chainlink.Request memory req = buildChainlinkRequest(
             jobIdMultipleNumbers,
             address(this),
             this.fulfillResults.selector
         );
-        req.add("get", gamesAPI);
-        req.add("path", _gameId.toString());
+        req.add("get", resultsAPI);
+        req.add("path1", string(abi.encodePacked(_gameId.toString(), ",teamA")));
+        req.add("path2", string(abi.encodePacked(_gameId.toString(), ",teamB")));
 
         lastGame = _gameId;
         bytes32 request = sendOperatorRequest(req, fee);
@@ -210,7 +209,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         emit RequestResultSent(request);        
     }
     
-    function addGamesFromAPI() public {
+    function addGamesFromAPI() public isRelayer{
         Chainlink.Request memory req = buildChainlinkRequest(
             jobIdBytes,
             address(this),
@@ -323,9 +322,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
             games[_gameId].lotteryPool += games[_gameId].betsAmount;
         }
 
-        
         for (uint i = 0; i < winnersCount; i++) {
-            // payable(winners[i].user).transfer(games[_gameId].betsAmount * winners[i].amount / winnersBet);
             USDc.transfer(winners[i].user, games[_gameId].betsAmount * winners[i].amount / winnersBet);
         }
         lastGame = _gameId;
