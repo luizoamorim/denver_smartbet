@@ -22,6 +22,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
     // Game Variables
     mapping(uint256 => mapping(uint256 => Bet)) public betsByGame;
     mapping(uint256 => mapping(uint256 => Bet)) public loosersByGame;
+    mapping(uint256 => address) public loterryWinners;
     mapping(uint256 => Game) public games;
 
     uint256 public gameCount;
@@ -244,8 +245,9 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         lastNumber = _number;
 
         if (_number != uint256(-1 ** 256)) {
-            // payable(loosers[lotteryWinnerIndex].user).transfer(game.lotteryPool);
+            loterryWinners[lastGame] = loosersByGame[lastGame][_number-1].user;
             USDc.transfer(loosersByGame[lastGame][_number-1].user, games[lastGame].lotteryPool);
+
         }
     }
 
@@ -283,9 +285,10 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
     }
 
     // Admin Functions
+
     function updateGameScore(
         uint256 _gameId
-    ) public {
+    ) public isRelayer {
         _updateGameScore(_gameId);
     }
 
@@ -348,20 +351,10 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         numbersAPI = _newUrl;
     }
 
-    function updateChainlinkJobIdNumbers(bytes32 _newJobIdNumbers) public isAdmin {
-        jobIdNumbers = _newJobIdNumbers;
-    }
-
-    function updateChainlinkJobIdMultipleNumbers(bytes32 _newJobIdMultipleNumbers) public isAdmin {
-        jobIdMultipleNumbers = _newJobIdMultipleNumbers;
-    }
-
-    function updateChainlinkJobIdBytes(bytes32 _newJobIdBytes) public isAdmin {
-        jobIdBytes = _newJobIdBytes;
-    }
-
-    function updateRelayer(address _newRelayer) public isAdmin {
-        _grantRole(RELAYER, _newRelayer);
+    function updateChainlinkJobIdNumbers(bytes32 _newJobIdNumbers, bytes32 _newJobIdMultipleNumbers, bytes32 _newJobIdBytes) public isAdmin {
+        if(_newJobIdNumbers != 0x0) jobIdNumbers = _newJobIdNumbers;
+        if(_newJobIdMultipleNumbers != 0x0) jobIdMultipleNumbers = _newJobIdMultipleNumbers;
+        if(_newJobIdBytes != 0x0) jobIdBytes = _newJobIdBytes;
     }
 
     function transferFunds(uint256 _amount, address payable destination) public onlyOwner {
