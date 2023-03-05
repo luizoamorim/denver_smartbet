@@ -47,9 +47,15 @@ export default function Home(props: any) {
         const awayTeam = "Miami Heat";
         const awayTeamImage =
             "https://loodibee.com/wp-content/uploads/nba-miami-heat-logo-300x300.png";
-        const gameTime = 1646350800; // March 3, 2023 8:00:00 PM (UTC)
+        const gameTime = "2023-03-10T12:30:00.000Z";
         contract.methods
-            .addGame(homeTeam, homeTeamImage, awayTeam, awayTeamImage, gameTime)
+            .addGame(
+                web3.utils.asciiToHex(homeTeam, 32),
+                web3.utils.asciiToHex(homeTeamImage, 32),
+                web3.utils.asciiToHex(awayTeam, 32),
+                web3.utils.asciiToHex(awayTeamImage, 32),
+                web3.utils.asciiToHex(gameTime, 32),
+            )
             .send({ from: "0x929a4dfc610963246644b1a7f6d1aed40a27dd2f" })
             .then((receipt: any) => {
                 console.log("OK: ", receipt);
@@ -108,6 +114,9 @@ export default function Home(props: any) {
             teamBImage={game.awayTeamImage}
             date={game.gameTime}
             betQt={game.betsCount}
+            gameCompleted={game.gameCompleted}
+            betsAmount={game.betsAmount}
+            lotteryPool={game.lotteryPool}
         />
     ));
 
@@ -191,11 +200,12 @@ export async function getServerSideProps() {
 
     let cont = 0;
     let games: any[] = [];
-    do {
+
+    while ((await contract.methods.games(cont).call()).homeTeam !== null) {
         console.log("EXAMPLE: ", await contract.methods.games(cont).call());
         games.push(await contract.methods.games(cont).call());
         cont++;
-    } while ((await contract.methods.games(cont).call()).homeTeam !== null);
+    }
 
     return {
         props: {
