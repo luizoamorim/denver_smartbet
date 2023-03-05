@@ -29,7 +29,6 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
 
     // Admin Variables
     bytes32 private constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
-    bytes32 private constant MOD_ROLE = keccak256("MOD_ROLE");
     bytes32 private constant RELAYER = keccak256("RELAYER");
     string private numbersAPI;
     string private gamesAPI;
@@ -48,11 +47,6 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
 
     // USDC Variables
     USDC public USDc;
-
-    modifier isMod {
-        require(hasRole(MOD_ROLE, msg.sender) || hasRole(ADMIN_ROLE, msg.sender) || msg.sender == owner(), "IS_NOT_MOD_OR_ADMIN");
-        _;
-    }
 
     modifier isAdmin {
         require(hasRole(ADMIN_ROLE, msg.sender) || msg.sender == owner(), "IS_NOT_ADMIN");
@@ -119,7 +113,6 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         bytes32 _jobIdBytes,
         address _relayer,
         address _usdcContractAddress,
-        address[] memory _mods,
         address[] memory _admins,
         string[] memory _API
         ) {
@@ -138,14 +131,12 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         USDc = USDC(_usdcContractAddress);
 
         // Admin Construct
-        for (uint256 i = 0; i < _mods.length; ++i) {
-            _grantRole(MOD_ROLE, _mods[i]);
-        }
 
         for (uint256 i = 0; i < _admins.length; ++i) {
             _grantRole(ADMIN_ROLE, _admins[i]);
         }
 
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(RELAYER, _relayer);
 
         numbersAPI = _API[0];
