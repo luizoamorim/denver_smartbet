@@ -8,13 +8,15 @@ import GameCard from "@/components/gameCard";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSignOutAlt } from "@fortawesome/free-solid-svg-icons";
 import main from "@/deployment/env";
+import env from "@/deployment/env";
+import getSportsABI from "@/utils/getSportsABI";
 
 export default function Home(props: any) {
     const [address, setAddress] = useState("");
     const [games, setGames] = useState([]);
+    const [sportsABI, setSportsABI] = useState();
 
     useEffect(() => {
-        main();
         const storedAddress = localStorage.getItem("walletAddress");
         if (storedAddress) {
             setAddress(storedAddress);
@@ -37,8 +39,8 @@ export default function Home(props: any) {
         const address = (await web3.eth.getAccounts())[0];
         console.log("ADDRESS: ", address);
         const contract = new web3.eth.Contract(
-            SportsABI.abi as any,
-            process.env.NEXT_PUBLIC_SMARTBET_CONTRACT_ADDRESS,
+            props.sportsABI.abi as any,
+            env.SMARTBET_CONTRACT_ADDRESS,
         );
 
         // const homeTeam = "Denver Nuggets";
@@ -64,8 +66,8 @@ export default function Home(props: any) {
         const address = (await web3.eth.getAccounts())[0];
         console.log("ADDRESS: ", address);
         const contract = new web3.eth.Contract(
-            SportsABI.abi as any,
-            process.env.NEXT_PUBLIC_SMARTBET_CONTRACT_ADDRESS,
+            props.sportsABI.abi as any,
+            env.SMARTBET_CONTRACT_ADDRESS,
         );
 
         let cont = 0;
@@ -85,8 +87,8 @@ export default function Home(props: any) {
         const address = (await web3.eth.getAccounts())[0];
         console.log("ADDRESS: ", address);
         const contract = new web3.eth.Contract(
-            SportsABI.abi as any,
-            process.env.NEXT_PUBLIC_SMARTBET_CONTRACT_ADDRESS,
+            props.sportsABI.abi as any,
+            env.SMARTBET_CONTRACT_ADDRESS,
         );
         console.log("CONTRACT: ", contract);
         // const signer = await provider.getSigner();
@@ -184,12 +186,14 @@ export async function getServerSideProps() {
     // Connect to the Ethereum network
 
     const web3 = new Web3(
-        `https://polygon-mumbai.infura.io/v3/${process.env.NEXT_PUBLIC_INFURA_ID}`,
+        `https://polygon-mumbai.infura.io/v3/${env.INFURA_ID}`,
     );
+
+    const SportsABI = await getSportsABI();
 
     const contract = new web3.eth.Contract(
         SportsABI.abi as any,
-        process.env.NEXT_PUBLIC_SMARTBET_CONTRACT_ADDRESS,
+        env.SMARTBET_CONTRACT_ADDRESS,
     );
 
     let cont = 0;
@@ -204,6 +208,7 @@ export async function getServerSideProps() {
     return {
         props: {
             games: JSON.parse(JSON.stringify(games)),
+            sportsABI: JSON.parse(JSON.stringify(SportsABI)),
         },
     };
 }

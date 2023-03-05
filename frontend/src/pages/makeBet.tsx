@@ -9,6 +9,8 @@ import { useRouter } from "next/router";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSignOutAlt } from "@fortawesome/free-solid-svg-icons";
 import moment from "moment-timezone";
+import env from "@/deployment/env";
+import getSportsABI from "@/utils/getSportsABI";
 
 interface GameCardProps {
     gameId: number;
@@ -25,7 +27,12 @@ function toUSDC(num: number): number {
 function fromUSDC(num: number): number {
     return num / 10 ** 6;
 }
-export default function MakeBet({ query, bets, gameConverted }: any) {
+export default function MakeBet({
+    query,
+    bets,
+    gameConverted,
+    sportsABI,
+}: any) {
     const obj = JSON.parse(query.obj);
     const [address, setAddress] = useState("");
     const router = useRouter();
@@ -34,9 +41,10 @@ export default function MakeBet({ query, bets, gameConverted }: any) {
     const [inputBetValue, setInputBetValue] = useState("");
     const [stateBets, setStateBets] = useState<any[]>(bets);
     const [stateGameConverted, setStateGameConverted] =
-        useState<any[]>(gameConverted);
+        useState<any>(gameConverted);
 
     useEffect(() => {
+        console.log("TESTEEEEEEEEEE: ", sportsABI);
         const storedAddress = localStorage.getItem("walletAddress");
         if (!storedAddress) {
             router.push("/");
@@ -72,8 +80,8 @@ export default function MakeBet({ query, bets, gameConverted }: any) {
         const web3 = new Web3(magic.rpcProvider as any);
         const address = (await web3.eth.getAccounts())[0];
         const contract = new web3.eth.Contract(
-            SportsABI.abi as any,
-            process.env.NEXT_PUBLIC_SMARTBET_CONTRACT_ADDRESS,
+            sportsABI.abi as any,
+            env.SMARTBET_CONTRACT_ADDRESS,
         );
         setStateBets([
             ...stateBets,
@@ -87,18 +95,18 @@ export default function MakeBet({ query, bets, gameConverted }: any) {
         const web3 = new Web3(magic.rpcProvider as any);
         const address = (await web3.eth.getAccounts())[0];
         const contract = new web3.eth.Contract(
-            SportsABI.abi as any,
-            process.env.NEXT_PUBLIC_SMARTBET_CONTRACT_ADDRESS,
+            sportsABI.abi as any,
+            env.SMARTBET_CONTRACT_ADDRESS,
         );
 
         const usdcContract = new web3.eth.Contract(
             USDCABI as any,
-            process.env.NEXT_PUBLIC_USDC_CONTRACT_ADDRESS,
+            env.USDC_CONTRACT_ADDRESS,
         );
 
         const usdcTxn = await usdcContract.methods
             .approve(
-                process.env.NEXT_PUBLIC_SMARTBET_CONTRACT_ADDRESS,
+                env.SMARTBET_CONTRACT_ADDRESS,
                 toUSDC(parseFloat(inputBetValue)),
             )
             .send({ from: address });
@@ -119,8 +127,11 @@ export default function MakeBet({ query, bets, gameConverted }: any) {
             .then((receipt: any) => {
                 web3.eth
                     .getTransactionReceipt(receipt.transactionHash)
-                    .then(() => {
+                    .then(async () => {
                         router.reload();
+                        setStateGameConverted(
+                            await contract.methods.games(gameConverted.gameId),
+                        );
                     });
             })
             .catch((error: any) => {
@@ -197,24 +208,28 @@ export default function MakeBet({ query, bets, gameConverted }: any) {
                     <div className="flex w-full justify-around">
                         <div className="flex flex-col items-center justify-center">
                             <Image
-                                src={gameConverted.teamAImage}
+                                src={stateGameConverted.teamAImage}
                                 alt="an team immage"
                                 width={56}
                                 height={56}
                                 className="rounded-xl"
                             />
-                            <div className="w-full">{gameConverted.teamA}</div>
+                            <div className="w-full">
+                                {stateGameConverted.teamA}
+                            </div>
                         </div>
                         <div></div>
                         <div className="flex flex-col items-center justify-center">
                             <Image
-                                src={gameConverted.teamBImage}
+                                src={stateGameConverted.teamBImage}
                                 alt="an team immage"
                                 width={56}
                                 height={56}
                                 className="rounded-xl"
                             />
-                            <div className="w-full">{gameConverted.teamB}</div>
+                            <div className="w-full">
+                                {stateGameConverted.teamB}
+                            </div>
                         </div>
                     </div>
                     <div className="flex w-full justify-around items-center px-4">
@@ -351,12 +366,13 @@ export default function MakeBet({ query, bets, gameConverted }: any) {
 
 export async function getServerSideProps(context: any) {
     const web3 = new Web3(
-        `https://polygon-mumbai.infura.io/v3/${process.env.NEXT_PUBLIC_INFURA_ID}`,
+        `https://polygon-mumbai.infura.io/v3/${env.INFURA_ID}`,
     );
+    const SportsABI = await getSportsABI();
 
     const contract = new web3.eth.Contract(
         SportsABI.abi as any,
-        process.env.NEXT_PUBLIC_SMARTBET_CONTRACT_ADDRESS,
+        env.SMARTBET_CONTRACT_ADDRESS,
     );
 
     const obj = JSON.parse(context.query.obj);
@@ -390,6 +406,7 @@ export async function getServerSideProps(context: any) {
             query: context.query,
             bets: JSON.parse(JSON.stringify(bets)),
             gameConverted: JSON.parse(JSON.stringify(gameConverted)),
+            sportsABI: JSON.parse(JSON.stringify(SportsABI)),
         },
     };
 }
