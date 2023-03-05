@@ -229,7 +229,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         req.add("get", gamesAPI);
         req.add("path", gameCount.toString());
 
-        bytes32 request = sendOperatorRequest(req, fee);
+        bytes32 request = sendOperatorRequest(req, fee / 2);
 
         emit RequestBytesSent(request);
     }
@@ -239,8 +239,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
     function fulfillNumber(
         bytes32 _requestId,
         uint256 _number
-    ) public recordChainlinkFulfillment(_requestId) 
-    {        
+    ) public recordChainlinkFulfillment(_requestId) {        
         emit RequestNumberFulfilled(_requestId, _number);
         lastNumber = _number;
 
@@ -254,17 +253,17 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         bytes32 requestId,
         uint256 _teamA,
         uint256 _teamB
-    ) public recordChainlinkFulfillment(requestId) 
-    {
+    ) public recordChainlinkFulfillment(requestId) {
         emit RequestResultFulfilled(requestId, _teamA, _teamB);
-        updateGameScore(lastGame, _teamA, _teamB);
+        games[lastGame].homeScore = _teamA;
+        games[lastGame].awayScore = _teamB;
+        games[lastGame].gameCompleted = true;
     }
 
     function fulfillBytesArray(
         bytes32 requestId, 
         bytes[] memory _arrayOfBytes
-    ) public recordChainlinkFulfillment(requestId) 
-    {        
+    ) public recordChainlinkFulfillment(requestId) {
         emit RequestBytesFulfilled(requestId, _arrayOfBytes);
         addGame(_arrayOfBytes[0], _arrayOfBytes[1], _arrayOfBytes[2], _arrayOfBytes[3], _arrayOfBytes[4]);
     }
@@ -277,23 +276,20 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         bytes memory _awayTeam, 
         bytes memory _awayTeamImage, 
         bytes memory _gameTime
-    ) internal { 
-
+    ) internal{ 
         games[gameCount] = Game(_homeTeam, _homeTeamImage, _awayTeam, _awayTeamImage, _gameTime, 0, 0, false, 0, 0, 0);
         gameCount++;
         emit GameCreated(_gameTime, _homeTeam, _awayTeam);
     }
 
+    // Admin Functions
+
     function updateGameScore(
-        uint256 _gameId, 
-        uint256 _homeScore, 
-        uint256 _awayScore
-    ) internal {
-        
+        uint256 _gameId
+    ) public isMod {
         require(_gameId < gameCount, "Invalid game ID");
-        games[_gameId].homeScore = _homeScore;
-        games[_gameId].awayScore = _awayScore;
-        games[_gameId].gameCompleted = true;
+        require(games[_gameId].gameCompleted, "The game is not completed");
+        
 
         if(games[_gameId].betsCount == 0) {
             return;
@@ -302,7 +298,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         uint256 winnersSize = 0;
 
         for (uint i = 0; i < games[_gameId].betsCount; i++) {
-            if (betsByGame[_gameId][i].homeScore == _homeScore && betsByGame[_gameId][i].awayScore == _awayScore) {
+            if (betsByGame[_gameId][i].homeScore == games[_gameId].homeScore && betsByGame[_gameId][i].awayScore == games[_gameId].awayScore) {
                 winnersSize++;
             }
         }
@@ -313,7 +309,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         uint256 winnersBet = 0;
 
         for (uint i = 0; i < games[_gameId].betsCount; i++) {
-            if (betsByGame[_gameId][i].homeScore == _homeScore && betsByGame[_gameId][i].awayScore == _awayScore) {
+            if (betsByGame[_gameId][i].homeScore == games[_gameId].homeScore && betsByGame[_gameId][i].awayScore == games[_gameId].awayScore) {
                 betsByGame[_gameId][i].betWon = true;
                 
                 winners[winnersCount] = (betsByGame[_gameId][i]);
@@ -338,8 +334,6 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         selectLotteryWinner(loosersCount);
 
     }
-
-    // Admin Functions
 
     function updateGamesOracle(address _newOracle) public isAdmin {
         OracleAddress = _newOracle;
