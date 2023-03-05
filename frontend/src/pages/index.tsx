@@ -192,9 +192,10 @@ export async function getServerSideProps() {
     let cont = 0;
     let games: any[] = [];
     do {
+        console.log("EXAMPLE: ", await contract.methods.games(cont).call());
         games.push(await contract.methods.games(cont).call());
         cont++;
-    } while ((await contract.methods.games(cont).call()).homeTeam.length !== 0);
+    } while ((await contract.methods.games(cont).call()).homeTeam !== null);
 
     return {
         props: {
