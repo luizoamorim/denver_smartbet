@@ -283,10 +283,15 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
     }
 
     // Admin Functions
-
     function updateGameScore(
         uint256 _gameId
-    ) public isMod {
+    ) public {
+        _updateGameScore(_gameId);
+    }
+
+    function _updateGameScore(
+        uint256 _gameId
+    ) internal {
         require(_gameId < gameCount, "Invalid game ID");
         require(games[_gameId].gameCompleted, "The game is not completed");
         
