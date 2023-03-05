@@ -183,7 +183,9 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
             this.fulfillNumber.selector
         );
 
-        req.add("get", string(abi.encodePacked(numbersAPI, loosersQt.toString())));
+        string memory url = string(abi.encodePacked(numbersAPI, loosersQt.toString()));
+
+        req.add("get", url);
         req.add("path", "");
         req.addInt("times", 1);
 
@@ -198,9 +200,13 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
             address(this),
             this.fulfillResults.selector
         );
+        
+        string memory url1 = string(abi.encodePacked(_gameId.toString(), ",teamA"));
+        string memory url2 = string(abi.encodePacked(_gameId.toString(), ",teamB"));
+
         req.add("get", resultsAPI);
-        req.add("path1", string(abi.encodePacked(_gameId.toString(), ",teamA")));
-        req.add("path2", string(abi.encodePacked(_gameId.toString(), ",teamB")));
+        req.add("path1", url1);
+        req.add("path2", url2);
 
         lastGame = _gameId;
         bytes32 request = sendOperatorRequest(req, fee);
@@ -267,7 +273,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         bytes memory _gameTime
     ) public { // internal, made public for testing
 
-        games[gameCount] = Game(_homeTeam, _homeTeamImage, _awayTeamImage, _awayTeam, _gameTime, 0, 0, false, 0, 0, 0);
+        games[gameCount] = Game(_homeTeam, _homeTeamImage, _awayTeam, _awayTeamImage, _gameTime, 0, 0, false, 0, 0, 0);
         gameCount++;
         emit GameCreated(_gameTime, _homeTeam, _awayTeam);
     }
