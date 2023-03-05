@@ -5,7 +5,7 @@ module.exports = {
         extend: {
             colors: {
                 appred: {
-                    100: "#FD1111",
+                    100: "#EA1436",
                     200: "#EB2531",
                     250: "#E61422",
                 },

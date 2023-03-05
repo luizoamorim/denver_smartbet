@@ -174,7 +174,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
     }
 
     function addGame(string memory _homeTeam, string memory _homeTeamImage, string memory _awayTeam, string memory _awayTeamImage, string memory _gameTime) public isMod{ // it's internal, made public for testing
-        games[gameCount] = Game(_homeTeam, _homeTeamImage, _awayTeamImage, _awayTeam, _gameTime, 0, 0, false, 0, 0, 0);
+        games[gameCount] = Game(_homeTeam, _homeTeamImage, _awayTeam, _awayTeamImage, _gameTime, 0, 0, false, 0, 0, 0);
         gameCount++;
         emit GameCreated(_gameTime, _homeTeam, _awayTeam);
     }

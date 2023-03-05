@@ -5,12 +5,16 @@ import SportsABI from "../../artifacts/contracts/Sports.sol/Sports.json";
 import Web3 from "web3";
 import magic from "../utils/magic";
 import GameCard from "@/components/gameCard";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faSignOutAlt } from "@fortawesome/free-solid-svg-icons";
+import main from "@/deployment/env";
 
 export default function Home(props: any) {
     const [address, setAddress] = useState("");
     const [games, setGames] = useState([]);
 
     useEffect(() => {
+        main();
         const storedAddress = localStorage.getItem("walletAddress");
         if (storedAddress) {
             setAddress(storedAddress);
@@ -34,14 +38,18 @@ export default function Home(props: any) {
         console.log("ADDRESS: ", address);
         const contract = new web3.eth.Contract(
             SportsABI.abi as any,
-            "0x2f648fc2445bB5F60E8A41Ea573a750455EcCab8",
+            process.env.NEXT_PUBLIC_SMARTBET_CONTRACT_ADDRESS,
         );
 
-        const homeTeam = "New York Yankees";
-        const awayTeam = "Boston Red Sox";
+        const homeTeam = "Denver Nuggets";
+        const homeTeamImage =
+            "https://loodibee.com/wp-content/uploads/nba-denver-nuggets-logo-2018-300x300.png";
+        const awayTeam = "Miami Heat";
+        const awayTeamImage =
+            "https://loodibee.com/wp-content/uploads/nba-miami-heat-logo-300x300.png";
         const gameTime = 1646350800; // March 3, 2023 8:00:00 PM (UTC)
         contract.methods
-            .addGame(homeTeam, awayTeam, gameTime)
+            .addGame(homeTeam, homeTeamImage, awayTeam, awayTeamImage, gameTime)
             .send({ from: "0x929a4dfc610963246644b1a7f6d1aed40a27dd2f" })
             .then((receipt: any) => {
                 console.log("OK: ", receipt);
@@ -57,7 +65,7 @@ export default function Home(props: any) {
         console.log("ADDRESS: ", address);
         const contract = new web3.eth.Contract(
             SportsABI.abi as any,
-            "0x2f648fc2445bB5F60E8A41Ea573a750455EcCab8",
+            process.env.NEXT_PUBLIC_SMARTBET_CONTRACT_ADDRESS,
         );
 
         let cont = 0;
@@ -78,7 +86,7 @@ export default function Home(props: any) {
         console.log("ADDRESS: ", address);
         const contract = new web3.eth.Contract(
             SportsABI.abi as any,
-            "0x2f648fc2445bB5F60E8A41Ea573a750455EcCab8",
+            process.env.NEXT_PUBLIC_SMARTBET_CONTRACT_ADDRESS,
         );
         console.log("CONTRACT: ", contract);
         // const signer = await provider.getSigner();
@@ -95,7 +103,9 @@ export default function Home(props: any) {
         <GameCard
             gameId={index}
             teamA={game.homeTeam}
+            teamAImage={game.homeTeamImage}
             teamB={game.awayTeam}
+            teamBImage={game.awayTeamImage}
             date={game.gameTime}
             betQt={game.betsCount}
         />
@@ -103,7 +113,7 @@ export default function Home(props: any) {
 
     return (
         <div style={{ height: "100%" }}>
-            <div className="h-32 p-8 bg-appred-200 flex items-center justify-between">
+            <div className="h-32 p-8 bg-appred-100 flex items-center justify-between">
                 <div>
                     <Image
                         src={logo}
@@ -130,12 +140,12 @@ export default function Home(props: any) {
                         {!address && <p>ConnectWallet</p>}
                     </div>
                     {address && (
-                        <div
-                            className="bg-red-400 hover:cursor-pointer w-14 h-14 ml-2 rounded flex items-center justify-center text-white"
+                        <FontAwesomeIcon
+                            className="w-10 ml-4 text-white hover:text-red-700 hover:cursor-pointer"
+                            icon={faSignOutAlt}
                             onClick={() => logoutMagicLink()}
-                        >
-                            Exit
-                        </div>
+                            title="logout"
+                        />
                     )}
                     <div
                         className="bg-blue-700 hover:cursor-pointer w-14 h-14 ml-2 rounded flex items-center justify-center text-white"
@@ -158,8 +168,8 @@ export default function Home(props: any) {
                 </div>
             </div>
             <div
-                style={{ height: "100%" }}
-                className="flex justify-center items-center w-full py-10 bg-no-repeat bg-cover bg-[url(../../public/assets/betEarn.svg)]"
+                className="flex justify-center w-full py-10 bg-no-repeat bg-cover bg-[url(../../public/assets/betEarn.svg)]"
+                style={{ height: "850px" }}
             >
                 <div className="grid grid-cols-4 gap-4">{itemList}</div>
             </div>
@@ -176,7 +186,7 @@ export async function getServerSideProps() {
 
     const contract = new web3.eth.Contract(
         SportsABI.abi as any,
-        "0x2f648fc2445bB5F60E8A41Ea573a750455EcCab8",
+        process.env.NEXT_PUBLIC_SMARTBET_CONTRACT_ADDRESS,
     );
 
     let cont = 0;
