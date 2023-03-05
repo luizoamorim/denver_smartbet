@@ -42,9 +42,24 @@ export default function MakeBet({
     const [stateBets, setStateBets] = useState<any[]>(bets);
     const [stateGameConverted, setStateGameConverted] =
         useState<any>(gameConverted);
+    const [winnerLottery, setWinnerLottery] = useState();
 
     useEffect(() => {
-        console.log("TESTEEEEEEEEEE: ", sportsABI);
+        const getLot = async () => {
+            const web3 = new Web3(magic.rpcProvider as any);
+            const address = (await web3.eth.getAccounts())[0];
+            const contract = new web3.eth.Contract(
+                sportsABI.abi as any,
+                env.SMARTBET_CONTRACT_ADDRESS,
+            );
+            setWinnerLottery(
+                await contract.methods
+                    .loterryWinners(gameConverted.gameId)
+                    .call(),
+            );
+        };
+        getLot();
+
         const storedAddress = localStorage.getItem("walletAddress");
         if (!storedAddress) {
             router.push("/");
@@ -333,28 +348,23 @@ export default function MakeBet({
                                         Address
                                     </p>
                                 </div>
-                                <div className="flex mt-4 justify-around w-full">
-                                    <p>0x9d3da2b...de5f</p>
-                                </div>
-                                <div className="flex mt-4 justify-around w-full">
-                                    <p>0x9d3da2b...de5f</p>
-                                </div>
+                                {bets.map((bet: any, index: number) => {
+                                    {
+                                        bet.betWon && <div key={index}></div>;
+                                    }
+                                })}
                             </div>
                             <div className="w-4/12 h-60 flex flex-col rounded-3xl bg-white bg-opacity-90 p-6 hover:bg-inchworm">
                                 <p className="flex justify-center items-center text-3xl font-bold">
                                     Lottery Winners
                                 </p>
-                                <div className="flex mt-10 justify-around w-full border-b-2">
+                                <div className="flex mt-10 justify-center w-full border-b-2">
                                     <p className="flex justify-center items-center">
                                         Address
                                     </p>
+                                    <p>{winnerLottery}</p>
                                 </div>
-                                <div className="flex mt-4 justify-around w-full">
-                                    <p>0x9d3da2b...de5f</p>
-                                </div>
-                                <div className="flex mt-4 justify-around w-full">
-                                    <p>0x9d3da2b...de5f</p>
-                                </div>
+                                <div>{}</div>
                             </div>
                         </div>
                     )}
