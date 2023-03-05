@@ -41,6 +41,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
     bytes32 private jobIdBytes;
     bytes32 private jobIdMultipleNumbers;
     uint256 private fee;
+    uint256 private fee2;
     uint256 private lastNumber;
     uint256 private lastGame;
 
@@ -130,6 +131,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         jobIdBytes = _jobIdBytes;
         jobIdMultipleNumbers = _jobIdMultipleNumbers;
         fee = (1 * LINK_DIVISIBILITY) / 10; // 0,1 * 10**18 (Varies by network and job)
+        fee2 = ((1 * LINK_DIVISIBILITY) / 1000) * 35; // 0,1 * 10**18 (Varies by network and job)
 
         // USDC Construct
         USDc = USDC(_usdcContractAddress);
@@ -212,7 +214,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         req.addInt("multiply", 1);
 
         lastGame = _gameId;
-        bytes32 request = sendOperatorRequest(req, fee);
+        bytes32 request = sendOperatorRequest(req, fee2);
 
         emit RequestResultSent(request);        
     }
@@ -275,7 +277,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         bytes memory _awayTeam, 
         bytes memory _awayTeamImage, 
         bytes memory _gameTime
-    ) public { // internal, made public for testing
+    ) internal { 
 
         games[gameCount] = Game(_homeTeam, _homeTeamImage, _awayTeam, _awayTeamImage, _gameTime, 0, 0, false, 0, 0, 0);
         gameCount++;
