@@ -8,8 +8,8 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 interface USDC {
-    // function balanceOf(address account) external view returns (uint256);
-    // function allowance(address owner, address spender) external view returns (uint256);
+    function balanceOf(address account) external view returns (uint256);
+    function allowance(address owner, address spender) external view returns (uint256);
     function transfer(address recipient, uint256 amount) external returns (bool);
     function approve(address spender, uint256 amount) external returns (bool);
     function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
@@ -106,7 +106,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
     event RequestResultSent(bytes32 indexed requestId);
     event RequestNumberFulfilled(bytes32 indexed requestId, uint256 random);
     event RequestBytesFulfilled(bytes32 indexed requestId, bytes[] indexed data);
-    event RequestResultFulfilled( bytes32 indexed requestId, uint256 TeamA, uint256 TeamB);
+    event RequestResultFulfilled(bytes32 indexed requestId, uint256 TeamA, uint256 TeamB);
 
     constructor(
         address _chainlinkToken,
@@ -119,7 +119,6 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         address[] memory _mods,
         address[] memory _admins,
         string[] memory _API
-        // string memory _resultsAPI
         ) {
 
         // Chainlink construct
@@ -266,7 +265,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         bytes memory _awayTeam, 
         bytes memory _awayTeamImage, 
         bytes memory _gameTime
-    ) internal {
+    ) public { // internal, made public for testing
 
         games[gameCount] = Game(_homeTeam, _homeTeamImage, _awayTeamImage, _awayTeam, _gameTime, 0, 0, false, 0, 0, 0);
         gameCount++;
@@ -291,8 +290,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         uint256 winnersSize = 0;
 
         for (uint i = 0; i < games[_gameId].betsCount; i++) {
-            Bet storage bet = betsByGame[_gameId][i];
-            if (bet.homeScore == _homeScore && bet.awayScore == _awayScore) {
+            if (betsByGame[_gameId][i].homeScore == _homeScore && betsByGame[_gameId][i].awayScore == _awayScore) {
                 winnersSize++;
             }
         }
@@ -304,18 +302,17 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         uint256 winnersBet = 0;
 
         for (uint i = 0; i < games[_gameId].betsCount; i++) {
-            Bet storage bet = betsByGame[_gameId][i];
-            if (bet.homeScore == _homeScore && bet.awayScore == _awayScore) {
-                bet.betWon = true;
+            if (betsByGame[_gameId][i].homeScore == _homeScore && betsByGame[_gameId][i].awayScore == _awayScore) {
+                betsByGame[_gameId][i].betWon = true;
                 
-                winners[winnersCount] = (bet);
-                winnersBet += bet.amount;
+                winners[winnersCount] = (betsByGame[_gameId][i]);
+                winnersBet += betsByGame[_gameId][i].amount;
                 winnersCount++;
             } else {
-                loosersByGame[_gameId][loosersCount] = (bet);
+                loosersByGame[_gameId][loosersCount] = (betsByGame[_gameId][i]);
                 loosersCount++;
             }
-            bet.betCompleted = true;
+            betsByGame[_gameId][i].betCompleted = true;
         }
 
         if(winnersCount == 0) {
