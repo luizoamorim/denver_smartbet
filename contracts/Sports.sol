@@ -36,6 +36,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
 
 
     // Chainlink Variables
+    address private OracleAddress;
     bytes32 private jobIdNumbers;
     bytes32 private jobIdBytes;
     bytes32 private jobIdMultipleNumbers;
@@ -110,7 +111,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
 
     constructor(
         address _chainlinkToken,
-        address _chainlinkOracle,
+        address[] memory _chainlinkOracle,
         bytes32 _jobIdNumbers,
         bytes32 _jobIdMultipleNumbers,
         bytes32 _jobIdBytes,
@@ -123,7 +124,8 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
 
         // Chainlink construct
         setChainlinkToken(_chainlinkToken);
-        setChainlinkOracle(_chainlinkOracle);
+        setChainlinkOracle(_chainlinkOracle[1]);
+        OracleAddress = _chainlinkOracle[0];
         jobIdNumbers = _jobIdNumbers; 
         jobIdBytes = _jobIdBytes;
         jobIdMultipleNumbers = _jobIdMultipleNumbers;
@@ -189,7 +191,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         req.add("path", "");
         req.addInt("times", 1);
 
-        bytes32 request = sendChainlinkRequest(req, fee);
+        bytes32 request = sendChainlinkRequestTo(OracleAddress, req, fee);
 
         emit RequestNumberSent(request);
     }
@@ -207,6 +209,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         req.add("get", resultsAPI);
         req.add("path1", url1);
         req.add("path2", url2);
+        req.addInt("multiply", 1);
 
         lastGame = _gameId;
         bytes32 request = sendOperatorRequest(req, fee);
@@ -214,7 +217,7 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         emit RequestResultSent(request);        
     }
     
-    function addGamesFromAPI() public isRelayer{
+    function addGamesFromAPI() public isRelayer {
         Chainlink.Request memory req = buildChainlinkRequest(
             jobIdBytes,
             address(this),
@@ -234,8 +237,8 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
     function fulfillNumber(
         bytes32 _requestId,
         uint256 _number
-    ) public recordChainlinkFulfillment(_requestId) {
-        
+    ) public recordChainlinkFulfillment(_requestId) 
+    {        
         emit RequestNumberFulfilled(_requestId, _number);
         lastNumber = _number;
 
@@ -249,7 +252,8 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         bytes32 requestId,
         uint256 _teamA,
         uint256 _teamB
-    ) public recordChainlinkFulfillment(requestId) {
+    ) public recordChainlinkFulfillment(requestId) 
+    {
         emit RequestResultFulfilled(requestId, _teamA, _teamB);
         updateGameScore(lastGame, _teamA, _teamB);
     }
@@ -257,8 +261,8 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
     function fulfillBytesArray(
         bytes32 requestId, 
         bytes[] memory _arrayOfBytes
-    ) public recordChainlinkFulfillment(requestId) {
-        
+    ) public recordChainlinkFulfillment(requestId) 
+    {        
         emit RequestBytesFulfilled(requestId, _arrayOfBytes);
         addGame(_arrayOfBytes[0], _arrayOfBytes[1], _arrayOfBytes[2], _arrayOfBytes[3], _arrayOfBytes[4]);
     }
@@ -302,7 +306,6 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
         }
 
         Bet[] memory winners = new Bet[](winnersSize);
-        // Bet[] memory loosers = new Bet[](games[_gameId].betsCount - winnersSize);
         uint256 winnersCount = 0;
         uint256 loosersCount = 0;
         uint256 winnersBet = 0;
@@ -335,6 +338,10 @@ contract Sports is ChainlinkClient, Ownable, AccessControl{
     }
 
     // Admin Functions
+
+    function updateGamesOracle(address _newOracle) public isAdmin {
+        OracleAddress = _newOracle;
+    }
 
     function updateNumberAPI(string memory _newUrl) public isAdmin {
         numbersAPI = _newUrl;
