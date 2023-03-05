@@ -33,6 +33,8 @@ export default function MakeBet({ query, bets, gameConverted }: any) {
     const [inputBValue, setInputBValue] = useState("");
     const [inputBetValue, setInputBetValue] = useState("");
     const [stateBets, setStateBets] = useState<any[]>(bets);
+    const [stateGameConverted, setStateGameConverted] =
+        useState<any[]>(gameConverted);
 
     useEffect(() => {
         const storedAddress = localStorage.getItem("walletAddress");
@@ -115,8 +117,11 @@ export default function MakeBet({ query, bets, gameConverted }: any) {
                 gasLimit: 300000,
             })
             .then((receipt: any) => {
-                router.reload();
-                refreshBetsList();
+                web3.eth
+                    .getTransactionReceipt(receipt.transactionHash)
+                    .then(() => {
+                        router.reload();
+                    });
             })
             .catch((error: any) => {
                 console.error("Error:", error);
@@ -124,7 +129,10 @@ export default function MakeBet({ query, bets, gameConverted }: any) {
     };
 
     const itemList = bets.map((bet: any, index: number) => (
-        <div key={index} className="flex mt-4 justify-around w-full text-xl">
+        <div
+            key={index}
+            className="grid grid-cols-3 mt-4 justify-around w-full text-xl"
+        >
             <p>
                 {bet.user.slice(0, 5)}...
                 {bet.user.slice(bet.user.length - 4, bet.user.length)}
@@ -141,7 +149,7 @@ export default function MakeBet({ query, bets, gameConverted }: any) {
     }
 
     return (
-        <div style={{ height: "100%" }}>
+        <div>
             <div className="w-full h-32 p-8 bg-appred-250 flex items-center justify-between">
                 <div
                     className="hover:cursor-pointer"
@@ -182,7 +190,7 @@ export default function MakeBet({ query, bets, gameConverted }: any) {
                 </div>
             </div>
             <div
-                className="flex h-96 justify-center p-10 w-full bg-no-repeat bg-cover bg-[url(../../public/assets/betEarn.svg)]"
+                className="flex p-5 w-full bg-no-repeat bg-cover bg-[url(../../public/assets/betEarn.svg)]"
                 style={{ height: "850px" }}
             >
                 <div className="w-4/12 h-96 flex flex-col justify-center items-center rounded-3xl bg-white bg-opacity-95 hover:bg-inchworm p-10">
@@ -245,11 +253,11 @@ export default function MakeBet({ query, bets, gameConverted }: any) {
                     </div>
                 </div>
                 <div className="flex flex-col w-full items-center">
-                    <div className="w-10/12 h-96 flex flex-col rounded-3xl bg-white bg-opacity-90 p-6 hover:bg-inchworm">
-                        <p className="flex justify-center items-center text-3xl font-bold">
+                    <div className="w-10/12 h-96 flex flex-col text-center rounded-3xl bg-white bg-opacity-90 p-6 hover:bg-inchworm">
+                        <p className="flex justify-center text-3xl font-bold">
                             Bets History
                         </p>
-                        <div className="flex mt-10 justify-around w-full border-b-2">
+                        <div className="grid grid-cols-3 mt-10 justify-around w-full border-b-2">
                             <p className="font-bold text-gray-900">Address</p>
                             <p className="font-bold text-gray-900">Result</p>
                             <p className="font-bold text-gray-900">Amont</p>
@@ -266,15 +274,15 @@ export default function MakeBet({ query, bets, gameConverted }: any) {
                     {!obj.game.gameCompleted && (
                         <div className="w-full flex justify-center items-center mt-10">
                             <div className="w-4/12 h-60 flex flex-col mr-10 rounded-3xl bg-opacity-90 bg-white p-6 hover:bg-inchworm">
-                                <p className="flex justify-center items-center text-3xl font-bold">
+                                <p className="flex justify-center items-center text-2xl font-bold">
                                     Game Bet Amount
                                 </p>
                                 <div className="flex justify-center items-center h-full">
                                     <div className="flex items-end">
-                                        <p className="text-5xl font-bold">
-                                            {gameConverted.betsAmount}
+                                        <p className="text-5xl font-bold text-gray-900">
+                                            {fromUSDC(gameConverted.betsAmount)}
                                         </p>
-                                        <p className="text-2xl font-bold ml-1">
+                                        <p className="text-xl font-bold ml-1">
                                             USDC
                                         </p>
                                     </div>
@@ -287,7 +295,9 @@ export default function MakeBet({ query, bets, gameConverted }: any) {
                                 <div className="flex justify-center items-center h-full">
                                     <div className="flex items-end">
                                         <p className="text-5xl font-bold">
-                                            {gameConverted.lotteryPool}
+                                            {fromUSDC(
+                                                gameConverted.lotteryPool,
+                                            )}
                                         </p>
                                         <p className="text-2xl font-bold ml-1">
                                             USDC

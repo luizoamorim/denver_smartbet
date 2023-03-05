@@ -41,21 +41,15 @@ export default function Home(props: any) {
             process.env.NEXT_PUBLIC_SMARTBET_CONTRACT_ADDRESS,
         );
 
-        const homeTeam = "Denver Nuggets";
-        const homeTeamImage =
-            "https://loodibee.com/wp-content/uploads/nba-denver-nuggets-logo-2018-300x300.png";
-        const awayTeam = "Miami Heat";
-        const awayTeamImage =
-            "https://loodibee.com/wp-content/uploads/nba-miami-heat-logo-300x300.png";
-        const gameTime = "2023-03-10T12:30:00.000Z";
+        // const homeTeam = "Denver Nuggets";
+        // const homeTeamImage =
+        //     "https://loodibee.com/wp-content/uploads/nba-denver-nuggets-logo-2018-300x300.png";
+        // const awayTeam = "Miami Heat";
+        // const awayTeamImage =
+        //     "https://loodibee.com/wp-content/uploads/nba-miami-heat-logo-300x300.png";
+        // const gameTime = "2023-03-10T12:30:00.000Z";
         contract.methods
-            .addGame(
-                web3.utils.asciiToHex(homeTeam, 32),
-                web3.utils.asciiToHex(homeTeamImage, 32),
-                web3.utils.asciiToHex(awayTeam, 32),
-                web3.utils.asciiToHex(awayTeamImage, 32),
-                web3.utils.asciiToHex(gameTime, 32),
-            )
+            .addGamesFromAPI()
             .send({ from: "0x929a4dfc610963246644b1a7f6d1aed40a27dd2f" })
             .then((receipt: any) => {
                 console.log("OK: ", receipt);
