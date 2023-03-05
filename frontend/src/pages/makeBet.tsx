@@ -8,6 +8,7 @@ import magic from "../utils/magic";
 import { useRouter } from "next/router";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSignOutAlt } from "@fortawesome/free-solid-svg-icons";
+import moment from "moment-timezone";
 
 interface GameCardProps {
     gameId: number;
@@ -24,7 +25,7 @@ function toUSDC(num: number): number {
 function fromUSDC(num: number): number {
     return num / 10 ** 6;
 }
-export default function MakeBet({ query, bets }: any) {
+export default function MakeBet({ query, bets, gameConverted }: any) {
     const obj = JSON.parse(query.obj);
     const [address, setAddress] = useState("");
     const router = useRouter();
@@ -34,19 +35,12 @@ export default function MakeBet({ query, bets }: any) {
     const [stateBets, setStateBets] = useState<any[]>(bets);
 
     useEffect(() => {
-        // getBetsByGame();
-        console.log("BETSSSSSSSSSSSSSSSSSSSSSSSS: ", bets);
         const storedAddress = localStorage.getItem("walletAddress");
         if (!storedAddress) {
             router.push("/");
         }
         setAddress(storedAddress as string);
     }, []);
-
-    useEffect(() => {
-        // This code will run whenever `myArray` changes
-        console.log("myArray changed:", setStateBets);
-    }, [stateBets]);
 
     const loginWithMagicLink = async () => {
         const accounts = await magic.wallet.connectWithUI();
@@ -75,16 +69,9 @@ export default function MakeBet({ query, bets }: any) {
     const refreshBetsList = async () => {
         const web3 = new Web3(magic.rpcProvider as any);
         const address = (await web3.eth.getAccounts())[0];
-        console.log("ADDRESS: ", address);
         const contract = new web3.eth.Contract(
             SportsABI.abi as any,
             process.env.NEXT_PUBLIC_SMARTBET_CONTRACT_ADDRESS,
-        );
-        console.log(
-            "CHEGA::::: ",
-            await contract.methods
-                .betsByGame(obj.game?.gameId, stateBets.length + 1)
-                .call(),
         );
         setStateBets([
             ...stateBets,
@@ -95,10 +82,8 @@ export default function MakeBet({ query, bets }: any) {
     };
 
     const makeBet = async () => {
-        console.log("ENTRA!!", obj.game?.gameId);
         const web3 = new Web3(magic.rpcProvider as any);
         const address = (await web3.eth.getAccounts())[0];
-        console.log("ADDRESS: ", address);
         const contract = new web3.eth.Contract(
             SportsABI.abi as any,
             process.env.NEXT_PUBLIC_SMARTBET_CONTRACT_ADDRESS,
@@ -110,11 +95,19 @@ export default function MakeBet({ query, bets }: any) {
         );
 
         const usdcTxn = await usdcContract.methods
-            .approve(process.env.NEXT_PUBLIC_SMARTBET_CONTRACT_ADDRESS, 10000)
+            .approve(
+                process.env.NEXT_PUBLIC_SMARTBET_CONTRACT_ADDRESS,
+                toUSDC(parseFloat(inputBetValue)),
+            )
             .send({ from: address });
 
         contract.methods
-            .makeBet(obj.game?.gameId, inputAValue, inputBValue, 10000)
+            .makeBet(
+                obj.game?.gameId,
+                inputAValue,
+                inputBValue,
+                toUSDC(parseFloat(inputBetValue)),
+            )
             .send({
                 from: address,
                 value: 0,
@@ -122,7 +115,6 @@ export default function MakeBet({ query, bets }: any) {
                 gasLimit: 300000,
             })
             .then((receipt: any) => {
-                console.log("Transaction receipt:", receipt.hash);
                 router.reload();
                 refreshBetsList();
             })
@@ -132,7 +124,7 @@ export default function MakeBet({ query, bets }: any) {
     };
 
     const itemList = bets.map((bet: any, index: number) => (
-        <div key={index} className="flex mt-4 justify-around w-full">
+        <div key={index} className="flex mt-4 justify-around w-full text-xl">
             <p>
                 {bet.user.slice(0, 5)}...
                 {bet.user.slice(bet.user.length - 4, bet.user.length)}
@@ -197,24 +189,24 @@ export default function MakeBet({ query, bets }: any) {
                     <div className="flex w-full justify-around">
                         <div className="flex flex-col items-center justify-center">
                             <Image
-                                src={obj.game!.teamAImage}
+                                src={gameConverted.teamAImage}
                                 alt="an team immage"
                                 width={56}
                                 height={56}
                                 className="rounded-xl"
                             />
-                            <div className="w-full">{obj.game!.teamA}</div>
+                            <div className="w-full">{gameConverted.teamA}</div>
                         </div>
                         <div></div>
                         <div className="flex flex-col items-center justify-center">
                             <Image
-                                src={obj.game!.teamBImage}
+                                src={gameConverted.teamBImage}
                                 alt="an team immage"
                                 width={56}
                                 height={56}
                                 className="rounded-xl"
                             />
-                            <div className="w-full">{obj.game!.teamB}</div>
+                            <div className="w-full">{gameConverted.teamB}</div>
                         </div>
                     </div>
                     <div className="flex w-full justify-around items-center px-4">
@@ -258,11 +250,9 @@ export default function MakeBet({ query, bets }: any) {
                             Bets History
                         </p>
                         <div className="flex mt-10 justify-around w-full border-b-2">
-                            <p className="flex justify-center items-center">
-                                Address
-                            </p>
-                            <p>Result</p>
-                            <p>Amont</p>
+                            <p className="font-bold text-gray-900">Address</p>
+                            <p className="font-bold text-gray-900">Result</p>
+                            <p className="font-bold text-gray-900">Amont</p>
                         </div>
                         <div className="overflow-y-auto">
                             {stateBets && itemList}
@@ -279,14 +269,31 @@ export default function MakeBet({ query, bets }: any) {
                                 <p className="flex justify-center items-center text-3xl font-bold">
                                     Game Bet Amount
                                 </p>
-                                <p>{typeof obj.game.betsAmount}</p>
+                                <div className="flex justify-center items-center h-full">
+                                    <div className="flex items-end">
+                                        <p className="text-5xl font-bold">
+                                            {gameConverted.betsAmount}
+                                        </p>
+                                        <p className="text-2xl font-bold ml-1">
+                                            USDC
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
                             <div className="w-4/12 h-60 flex flex-col rounded-3xl bg-white bg-opacity-90 p-6 hover:bg-inchworm">
                                 <p className="flex justify-center items-center text-3xl font-bold">
                                     Lottery Amount
                                 </p>
-                                <div className="flex mt-10 justify-around w-full border-b-2"></div>
-                                <p>{typeof obj.game.lotteryPool}</p>
+                                <div className="flex justify-center items-center h-full">
+                                    <div className="flex items-end">
+                                        <p className="text-5xl font-bold">
+                                            {gameConverted.lotteryPool}
+                                        </p>
+                                        <p className="text-2xl font-bold ml-1">
+                                            USDC
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -343,29 +350,36 @@ export async function getServerSideProps(context: any) {
     );
 
     const obj = JSON.parse(context.query.obj);
+    const gameConverted = {
+        gameId: obj.game?.gameId,
+        date: moment(web3.utils.hexToAscii(obj.game!.date)),
+        teamA: web3.utils.hexToAscii(obj.game!.teamA),
+        teamAImage: web3.utils.hexToAscii(obj.game!.teamAImage),
+        teamB: web3.utils.hexToAscii(obj.game!.teamB),
+        teamBImage: web3.utils.hexToAscii(obj.game!.teamBImage),
+        betQt: obj.game!.betQt,
+        gameCompleted: obj.game!.gameCompleted,
+        lotteryPool: obj.game!.lotteryPool,
+        betsAmount: obj.game!.betsAmount,
+    };
+
     let cont = 0;
     let bets = [];
-    do {
+    while (
+        (await contract.methods.betsByGame(obj.game?.gameId, cont).call())
+            .user !== "0x0000000000000000000000000000000000000000"
+    ) {
         bets.push(
             await contract.methods.betsByGame(obj.game?.gameId, cont).call(),
         );
-        console.log(
-            "BET AQUI: ",
-            (await contract.methods.betsByGame(obj.game?.gameId, 7).call())
-                .user,
-        );
         cont++;
-    } while (
-        (await contract.methods.betsByGame(obj.game?.gameId, cont).call())
-            .user !== "0x0000000000000000000000000000000000000000"
-    );
-
-    console.log("BET HERE: ", bets);
+    }
 
     return {
         props: {
             query: context.query,
             bets: JSON.parse(JSON.stringify(bets)),
+            gameConverted: JSON.parse(JSON.stringify(gameConverted)),
         },
     };
 }
